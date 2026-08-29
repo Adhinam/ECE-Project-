@@ -1,0 +1,25 @@
+{
+  "store_id": "STORE_BLR_002",
+  "videos": [
+    {
+      "camera_id": "CAM_1",
+      "video_path": "A:\\CCTV Footage-20260529T160731Z-3-00144614ea\\CCTV Footage\\CAM 1.mp4"
+    },
+    {
+      "camera_id": "CAM_2",
+      "video_path": "A:\\CCTV Footage-20260529T160731Z-3-00144614ea\\CCTV Footage\\CAM 2.mp4"
+    },
+    {
+      "camera_id": "CAM_3",
+      "video_path": "A:\\CCTV Footage-20260529T160731Z-3-00144614ea\\CCTV Footage\\CAM 3.mp4"
+    },
+    {
+      "camera_id": "CAM_4",
+      "video_path": "A:\\CCTV Footage-20260529T160731Z-3-00144614ea\\CCTV Footage\\CAM 4.mp4"
+    },
+    {
+      "camera_id": "CAM_5",
+      "video_path": "A:\\CCTV Footage-20260529T160731Z-3-00144614ea\\CCTV Footage\\CAM 5.mp4"
+    }
+  ]
+}

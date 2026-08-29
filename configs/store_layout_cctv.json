@@ -1,0 +1,56 @@
+{
+  "store_id": "STORE_BLR_002",
+  "frame_width": 1920,
+  "frame_height": 1080,
+  "entry_exit_lines": [
+    {
+      "id": "main-entry",
+      "p1": [960, 160],
+      "p2": [960, 520],
+      "direction_in": "bottom"
+    }
+  ],
+  "zones": [
+    {
+      "id": "entrance-lobby",
+      "polygon": [[80, 80], [840, 80], [840, 620], [80, 620]]
+    },
+    {
+      "id": "checkout",
+      "polygon": [[1180, 360], [1860, 360], [1860, 980], [1180, 980]]
+    },
+    {
+      "id": "main-floor",
+      "polygon": [[320, 240], [1680, 240], [1680, 1040], [320, 1040]]
+    }
+  ],
+  "queues": [
+    {
+      "id": "checkout-1",
+      "polygon": [[1260, 420], [1760, 420], [1760, 900], [1260, 900]],
+      "max_capacity": 30
+    }
+  ],
+  "staff_areas": [
+    {
+      "id": "counter-back",
+      "polygon": [[1450, 300], [1880, 300], [1880, 560], [1450, 560]]
+    }
+  ],
+  "dwell_threshold_seconds": 30,
+  "reentry_window_seconds": 300,
+  "heatmap_resolution": 32,
+  "entry_exit": {
+    "cooldown_frames": 24,
+    "debounce_frames": 2,
+    "min_crossing_displacement_px": 3.0,
+    "group_crossing_frame_window": 3,
+    "entry_confidence_floor": 0.45
+  },
+  "zones_config": {
+    "dwell_threshold_seconds": 30,
+    "dwell_emit_interval_seconds": 30,
+    "occlusion_grace_frames": 20,
+    "zone_confidence_floor": 0.45
+  }
+}

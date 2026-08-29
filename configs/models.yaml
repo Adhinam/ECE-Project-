@@ -1,0 +1,33 @@
+# Model weights and inference thresholds for the detection pipeline.
+
+detector:
+  model_name: yolov8n.pt
+  confidence_threshold: 0.5
+  iou_threshold: 0.45
+  person_class_id: 0
+
+tracker:
+  track_thresh: 0.5
+  match_thresh: 0.8
+  track_buffer: 30
+
+reid:
+  enabled: true
+  # Lightweight HSV histogram Re-ID (pipeline/reid.py) — not OSNet training
+  similarity_threshold: 0.72
+  histogram_weight: 0.5
+  cosine_weight: 0.5
+  gallery_ttl_seconds: 300
+  gallery_max_entries: 500
+  model_name: histogram_v1  # reserved for future OSNet upgrade
+
+staff:
+  enabled: true
+  method: zone  # zone | heuristic
+
+calibration:
+  method: threshold_v1
+  thresholds:
+    entry: 0.85
+    zone_enter: 0.80
+    queue_join: 0.75

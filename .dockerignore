@@ -1,0 +1,39 @@
+# Git & IDE
+.git
+.gitignore
+.cursor
+.vscode
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+
+# Local env & secrets (never bake into images)
+.env
+.env.*
+!.env.example
+
+# Virtualenvs & build artifacts
+.venv
+venv
+dist
+build
+*.egg-info
+
+# Data & media (mount at runtime if needed)
+data/
+*.mp4
+*.avi
+*.mkv
+
+# Docs & tests (not needed in runtime images)
+tests/
+**/*_test.py
+pytest.ini
+htmlcov/
+.coverage
+
+# Agent / misc
+agent-transcripts/
+VirtualBox VMs/

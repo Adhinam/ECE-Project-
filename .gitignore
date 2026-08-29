@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Data & models
+data/events/
+data/videos/
+data/models/
+*.jsonl
+!tests/fixtures/**/*.jsonl
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Challenge datasets
+Store 1/
+Store 2/
+datasets/
+
+# Videos
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Generated outputs
+data/events/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment
+.venv/
+venv/
+.env
+
+
+
+# Datasets
+data/*.csv
+data/*.json
+data/*.mp4
+data/*.avi
+
+# Model weights
+*.pt
+*.pth
+
+# Logs
+*.log
+tracking_log.txt
+
+# Submission artifacts
+FINAL_DATASET_VALIDATION.md
+FINAL_GAP_ANALYSIS.md
+FINAL_REVIEWER_WALKTHROUGH.md
+FINAL_SUBMISSION_CHECKLIST.md
+RELEASE_CHECKLIST.md

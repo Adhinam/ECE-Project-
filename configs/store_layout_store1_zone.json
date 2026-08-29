@@ -1,0 +1,36 @@
+{
+  "store_id": "store1",
+  "frame_width": 1920,
+  "frame_height": 1080,
+  "entry_exit_lines": [],
+  "zones": [
+    {
+      "id": "entrance-lobby",
+      "polygon": [[0, 520], [960, 520], [960, 1080], [0, 1080]]
+    },
+    {
+      "id": "main-floor",
+      "polygon": [[160, 120], [1760, 120], [1760, 980], [160, 980]]
+    },
+    {
+      "id": "checkout",
+      "polygon": [[1100, 320], [1910, 320], [1910, 1060], [1100, 1060]]
+    }
+  ],
+  "queues": [
+    {
+      "id": "checkout-1",
+      "polygon": [[1180, 380], [1860, 380], [1860, 980], [1180, 980]],
+      "max_capacity": 30
+    }
+  ],
+  "dwell_threshold_seconds": 30,
+  "reentry_window_seconds": 300,
+  "heatmap_resolution": 32,
+  "zones_config": {
+    "dwell_threshold_seconds": 30,
+    "dwell_emit_interval_seconds": 30,
+    "occlusion_grace_frames": 18,
+    "zone_confidence_floor": 0.4
+  }
+}

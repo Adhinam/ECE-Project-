@@ -1,0 +1,1 @@
+{"schema_version":1,"event_id":"550e8400-e29b-41d4-a716-446655440000","event_type":"entry","store_id":"store-001","camera_id":"cam-entrance","occurred_at":"2026-05-29T12:00:00+00:00","track_id":1,"global_person_id":"gp-1","is_staff":false,"confidence":0.9,"calibration_method":"threshold_v1","bbox":[100,100,200,400],"frame_index":1,"payload":{"line_id":"main-entrance"}}

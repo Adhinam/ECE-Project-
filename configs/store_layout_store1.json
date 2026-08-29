@@ -1,0 +1,154 @@
+{
+  "store_id": "store1",
+  "frame_width": 1920,
+  "frame_height": 1080,
+  "entry_exit_lines": [
+    {
+      "id": "store-entry",
+      "p1": [
+        320,
+        780
+      ],
+      "p2": [
+        1600,
+        780
+      ],
+      "direction_in": "top"
+    }
+  ],
+  "zones": [
+    {
+      "id": "entrance-lobby",
+      "polygon": [
+        [
+          0,
+          520
+        ],
+        [
+          960,
+          520
+        ],
+        [
+          960,
+          1080
+        ],
+        [
+          0,
+          1080
+        ]
+      ]
+    },
+    {
+      "id": "main-floor",
+      "polygon": [
+        [
+          160,
+          120
+        ],
+        [
+          1760,
+          120
+        ],
+        [
+          1760,
+          980
+        ],
+        [
+          160,
+          980
+        ]
+      ]
+    },
+    {
+      "id": "checkout",
+      "polygon": [
+        [
+          1100,
+          320
+        ],
+        [
+          1910,
+          320
+        ],
+        [
+          1910,
+          1060
+        ],
+        [
+          1100,
+          1060
+        ]
+      ]
+    }
+  ],
+  "queues": [
+    {
+      "id": "checkout-1",
+      "polygon": [
+        [
+          1180,
+          380
+        ],
+        [
+          1860,
+          380
+        ],
+        [
+          1860,
+          980
+        ],
+        [
+          1180,
+          980
+        ]
+      ],
+      "max_capacity": 30
+    }
+  ],
+  "staff_areas": [
+    {
+      "id": "counter-back",
+      "polygon": [
+        [
+          1400,
+          260
+        ],
+        [
+          1910,
+          260
+        ],
+        [
+          1910,
+          520
+        ],
+        [
+          1400,
+          520
+        ]
+      ]
+    }
+  ],
+  "dwell_threshold_seconds": 30,
+  "reentry_window_seconds": 300,
+  "heatmap_resolution": 32,
+  "entry_exit": {
+    "cooldown_frames": 18,
+    "debounce_frames": 2,
+    "min_crossing_displacement_px": 2.0,
+    "group_crossing_frame_window": 4,
+    "entry_confidence_floor": 0.4
+  },
+  "zones_config": {
+    "dwell_threshold_seconds": 30,
+    "dwell_emit_interval_seconds": 30,
+    "occlusion_grace_frames": 18,
+    "zone_confidence_floor": 0.4
+  },
+  "layout_reference": {
+    "image_path": "A:\\Store 1-20260602T101818Z-3-001ec38db8\\Store 1\\Store 1 - layout.png",
+    "image_width": 1538,
+    "image_height": 788,
+    "video_width": 1920,
+    "video_height": 1080
+  }
+}

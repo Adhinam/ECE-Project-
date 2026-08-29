@@ -1,0 +1,37 @@
+# Development overrides — hot-reload via bind mounts
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+services:
+  api:
+    environment:
+      APP_ENV: development
+      LOG_JSON: "false"
+    volumes:
+      - ./app:/app/app:ro
+      - ./api:/app/api:ro
+      - ./schemas:/app/schemas:ro
+      - ./shared:/app/shared:ro
+      - ./configs:/app/configs:ro
+
+  migrate:
+    volumes:
+      - ./alembic:/app/alembic:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - ./app:/app/app:ro
+
+  dashboard:
+    environment:
+      APP_ENV: development
+      DASHBOARD_API_URL: http://api:8000
+    volumes:
+      - ./dashboard:/app/dashboard
+      - ./schemas:/app/schemas:ro
+      - ./shared:/app/shared:ro
+
+  pipeline:
+    volumes:
+      - ./pipeline:/app/pipeline
+      - ./schemas:/app/schemas:ro
+      - ./configs:/app/configs:ro
+      - ./ingest:/app/ingest:ro
+      - ./data:/data

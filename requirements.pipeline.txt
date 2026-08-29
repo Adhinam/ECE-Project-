@@ -1,0 +1,13 @@
+pydantic>=2.6,<3
+pydantic-settings>=2.2,<3
+python-dotenv>=1.0,<2
+structlog>=24.1,<25
+pyyaml>=6.0,<7
+httpx>=0.27,<1
+tenacity>=8.2,<9
+
+ultralytics>=8.1,<9
+opencv-python-headless>=4.9,<5
+numpy>=1.26,<3
+supervision>=0.19,<1
+shapely>=2.0,<3

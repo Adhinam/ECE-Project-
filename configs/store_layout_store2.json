@@ -1,0 +1,131 @@
+{
+  "store_id": "store2",
+  "frame_width": 960,
+  "frame_height": 1080,
+  "entry_exit_lines": [
+    {
+      "id": "store-entry",
+      "p1": [
+        60,
+        820
+      ],
+      "p2": [
+        900,
+        820
+      ],
+      "direction_in": "top"
+    }
+  ],
+  "zones": [
+    {
+      "id": "entrance-lobby",
+      "polygon": [
+        [
+          0,
+          540
+        ],
+        [
+          480,
+          540
+        ],
+        [
+          480,
+          1080
+        ],
+        [
+          0,
+          1080
+        ]
+      ]
+    },
+    {
+      "id": "main-floor",
+      "polygon": [
+        [
+          80,
+          80
+        ],
+        [
+          880,
+          80
+        ],
+        [
+          880,
+          1000
+        ],
+        [
+          80,
+          1000
+        ]
+      ]
+    },
+    {
+      "id": "checkout",
+      "polygon": [
+        [
+          480,
+          400
+        ],
+        [
+          940,
+          400
+        ],
+        [
+          940,
+          1060
+        ],
+        [
+          480,
+          1060
+        ]
+      ]
+    }
+  ],
+  "queues": [
+    {
+      "id": "checkout-1",
+      "polygon": [
+        [
+          500,
+          440
+        ],
+        [
+          920,
+          440
+        ],
+        [
+          920,
+          1000
+        ],
+        [
+          500,
+          1000
+        ]
+      ],
+      "max_capacity": 25
+    }
+  ],
+  "dwell_threshold_seconds": 30,
+  "reentry_window_seconds": 300,
+  "heatmap_resolution": 32,
+  "entry_exit": {
+    "cooldown_frames": 15,
+    "debounce_frames": 2,
+    "min_crossing_displacement_px": 2.0,
+    "group_crossing_frame_window": 3,
+    "entry_confidence_floor": 0.4
+  },
+  "zones_config": {
+    "dwell_threshold_seconds": 30,
+    "dwell_emit_interval_seconds": 30,
+    "occlusion_grace_frames": 15,
+    "zone_confidence_floor": 0.4
+  },
+  "layout_reference": {
+    "image_path": "A:\\Store 2-20260602T101819Z-3-001099f208\\Store 2\\store 2 - layout.png",
+    "image_width": 960,
+    "image_height": 1210,
+    "video_width": 960,
+    "video_height": 1080
+  }
+}

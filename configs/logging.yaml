@@ -1,0 +1,10 @@
+# Reference for structlog configuration (applied in shared/logging.py).
+
+version: 1
+json_logs: true
+log_level: INFO
+processors:
+  - structlog.contextvars.merge_contextvars
+  - structlog.processors.add_log_level
+  - structlog.processors.TimeStamper
+  - structlog.processors.JSONRenderer

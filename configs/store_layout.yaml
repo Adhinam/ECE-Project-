@@ -1,0 +1,46 @@
+# Store geometry: zones, entry/exit lines, queues, staff areas.
+# Loaded by pipeline and validated via schemas.config.StoreLayoutConfig
+
+store_id: store-001
+frame_width: 1920
+frame_height: 1080
+
+entry_exit_lines:
+  - id: main-entrance
+    p1: [960, 200]
+    p2: [960, 400]
+    direction_in: bottom
+
+zones:
+  - id: entrance-lobby
+    polygon: [[100, 100], [800, 100], [800, 600], [100, 600]]
+  - id: checkout
+    polygon: [[1200, 400], [1800, 400], [1800, 900], [1200, 900]]
+
+queues:
+  - id: checkout-1
+    polygon: [[1250, 450], [1750, 450], [1750, 850], [1250, 850]]
+    max_capacity: 20
+
+staff_areas:
+  - id: staff-only
+    polygon: [[50, 50], [300, 50], [300, 250], [50, 250]]
+
+dwell_threshold_seconds: 30
+reentry_window_seconds: 300
+heatmap_resolution: 32
+
+# Entry/exit line-crossing tuning (see pipeline/entry_exit.py)
+entry_exit:
+  cooldown_frames: 30
+  debounce_frames: 2
+  min_crossing_displacement_px: 4.0
+  group_crossing_frame_window: 0
+  entry_confidence_floor: 0.5
+
+# Zone tracking (see pipeline/zones.py) — also supported in store_layout.json
+zones_config:
+  dwell_threshold_seconds: 30
+  dwell_emit_interval_seconds: 30
+  occlusion_grace_frames: 15
+  zone_confidence_floor: 0.5
