@@ -19,8 +19,15 @@ from schemas.api import MetricConfidence
 
 
 @pytest.mark.unit
-def test_load_pos_from_fixture() -> None:
-    path = Path("data/pos_transactions.csv")
+def test_load_pos_from_fixture(tmp_path: Path) -> None:
+    path = tmp_path / "pos.csv"
+    path.write_text(
+        "store_id,transaction_id,timestamp,basket_value_inr\n"
+        "store-001,t1,2026-01-15T10:00:00Z,100\n"
+        "store-001,t2,2026-01-15T11:00:00Z,200\n"
+        "other,t3,2026-01-15T11:00:00Z,300\n",
+        encoding="utf-8",
+    )
     now = datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
     rows = load_pos_transactions(
         path,
@@ -48,3 +55,25 @@ def test_converted_visitors_window_match() -> None:
     )
     assert converted == {"VIS_aaa111"}
     assert conf == MetricConfidence.LOW
+
+
+def test_one_sale_cannot_convert_multiple_nearby_visitors():
+    now = datetime(2026, 3, 3, 14, 38, tzinfo=timezone.utc)
+    converted, confidence = converted_visitors_from_pos(
+        transactions=[PosTransaction("t1", "s", now)],
+        billing_last_seen={"a": now, "b": now - timedelta(seconds=20)},
+        match_window=timedelta(minutes=5),
+    )
+    assert converted == set()
+    assert confidence == MetricConfidence.LOW
+
+
+def test_transaction_volume_does_not_certify_identity():
+    now = datetime(2026, 3, 3, 14, 38, tzinfo=timezone.utc)
+    converted, confidence = converted_visitors_from_pos(
+        transactions=[PosTransaction(str(i), "s", now) for i in range(12)],
+        billing_last_seen={"a": now},
+        match_window=timedelta(minutes=5),
+    )
+    assert converted == {"a"}
+    assert confidence == MetricConfidence.LOW

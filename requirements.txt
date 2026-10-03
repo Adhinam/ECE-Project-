@@ -16,10 +16,10 @@ alembic>=1.13,<2
 greenlet>=3.0,<4
 
 # Pipeline (CPU-friendly defaults; GPU optional via base image)
-ultralytics>=8.1,<9
-opencv-python-headless>=4.9,<5
+ultralytics==8.4.172
+opencv-python>=4.9,<6
 numpy>=1.26,<3
-supervision>=0.19,<1
+supervision==0.27.0.post2
 shapely>=2.0,<3
 
 # Dashboard
@@ -30,3 +30,6 @@ plotly>=5.20,<6
 # Re-ID (optional; guarded by ENABLE_REID)
 # torch>=2.2,<3
 # torchvision>=0.17,<1
+
+# Local benchmark process memory measurement
+psutil>=7,<8

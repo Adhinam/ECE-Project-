@@ -17,9 +17,9 @@ def test_detector_yaml_from_models_config():
     root = Path(__file__).resolve().parents[2]
     cfg = DetectionConfig(models_config_path=root / "configs" / "models.yaml")
     yaml_cfg = cfg.load_detector_yaml()
-    assert yaml_cfg.model_name == "yolov8n.pt"
+    assert yaml_cfg.model_name == "yolo26n.pt"
     assert yaml_cfg.person_class_id == 0
-    assert yaml_cfg.confidence_threshold == 0.5
+    assert yaml_cfg.confidence_threshold == 0.1
 
 
 def test_resolved_thresholds_env_override():

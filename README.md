@@ -1,5 +1,13 @@
 # Store Intelligence Platform
 
+## Current CPU model and sample-video workflow
+
+The default model is **YOLO26 Nano**, with ByteTrack tracking. Review a sample
+without the website or database using `python -m pipeline.review --source video.mp4`.
+This saves an annotated video, per-frame CSV, and a measured timing/memory report.
+See [setup, comparison commands, and limitations](docs/VIDEO_REVIEW.md).
+Real CCTV accuracy and speed remain to be evaluated on representative footage.
+
 Production-style retail analytics platform built for **Purplle Tech Challenge 2026 – Round 2**.
 
 The system processes CCTV footage, detects and tracks customers, generates structured retail events, computes real-time store analytics, exposes APIs through FastAPI, and visualizes insights through a live Streamlit dashboard.
@@ -10,7 +18,7 @@ The system processes CCTV footage, detects and tracks customers, generates struc
 
 ### Computer Vision Pipeline
 
-* YOLOv8-based person detection
+* YOLO26-based person detection (YOLOv8 remains available as a comparison baseline)
 * Multi-object tracking
 * Entry / Exit detection
 * Zone visit tracking
@@ -219,7 +227,7 @@ make lint
 * SQLAlchemy
 * Streamlit
 * Docker
-* YOLOv8
+* YOLO26
 * OpenCV
 * Pytest
 

@@ -28,10 +28,15 @@ class DetectorYamlConfig(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
-    model_name: str = "yolov8n.pt"
+    model_name: str = "yolo26n.pt"
     confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     person_class_id: int = Field(default=0, ge=0)
+    imgsz: int = Field(default=640, ge=32, multiple_of=32)
+    cpu_threads: int = Field(default=4, ge=1)
+    clahe: bool = False
+    clahe_clip: float = Field(default=2.0, ge=0.1, le=10.0)
+    clahe_tile: int = Field(default=8, ge=2, le=32)
 
 
 class DetectionConfig(AppSettings):
@@ -176,6 +181,22 @@ class DetectionConfig(AppSettings):
         if self.person_class_id is not None:
             return self.person_class_id
         return self.load_detector_yaml().person_class_id
+
+    def detector_kwargs(self) -> dict[str, Any]:
+        """One detector configuration shared by every execution path."""
+        cfg = self.load_detector_yaml()
+        return {
+            "model_path": self.resolved_model_path(),
+            "confidence": self.resolved_confidence(),
+            "iou": self.resolved_iou(),
+            "person_class_id": self.resolved_person_class_id(),
+            "device": self.device,
+            "imgsz": cfg.imgsz,
+            "cpu_threads": cfg.cpu_threads,
+            "clahe": cfg.clahe,
+            "clahe_clip": cfg.clahe_clip,
+            "clahe_tile": cfg.clahe_tile,
+        }
 
     def load_tracker_yaml(self) -> TrackerYamlConfig:
         """Load tracker block from models YAML."""

@@ -39,3 +39,17 @@ def test_enrich_visitor_payload_after_entry(event_factory: EventFactory) -> None
     zone = event_factory.zone_enter("aisle-1", track_id=7)
     enriched = _enrich_visitor_payload(zone, session)
     assert "visitor_id" in enriched.payload
+
+
+def test_exit_keeps_identity_after_session_is_closed(event_factory: EventFactory):
+    session = SessionEngine("store-001")
+    entry = event_factory.entry(track_id=7)
+    session.process_event(entry)
+    enriched_entry = _enrich_visitor_payload(entry, session)
+    exit_event = event_factory.exit(track_id=7)
+    completed = session.process_event(exit_event)
+    assert completed is not None
+    assert session.get_active_by_track(7) is None
+    enriched_exit = _enrich_visitor_payload(exit_event, session, completed)
+    assert enriched_exit.global_person_id == enriched_entry.global_person_id
+    assert enriched_exit.payload["visitor_id"] == enriched_entry.payload["visitor_id"]

@@ -1,8 +1,15 @@
 # Model weights and inference thresholds for the detection pipeline.
 
 detector:
-  model_name: yolov8n.pt
-  confidence_threshold: 0.5
+  model_name: yolo26n.pt
+  # Preserve low-confidence detections for ByteTrack's second association pass.
+  confidence_threshold: 0.1
+  imgsz: 640
+  cpu_threads: 4  # Tune on the target CPU; shared by all detector entry points.
+  # Optional teammate preprocessing; disabled until tested on the sample footage.
+  clahe: false
+  clahe_clip: 2.0
+  clahe_tile: 8
   iou_threshold: 0.45
   person_class_id: 0
 

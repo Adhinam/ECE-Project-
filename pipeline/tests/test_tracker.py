@@ -6,6 +6,7 @@
 
 """Unit tests for tracker conversion helpers (no YOLO/ByteTrack required)."""
 
+import pytest
 import numpy as np
 import supervision as sv
 
@@ -32,7 +33,7 @@ def test_detections_to_supervision_and_back():
     frame = FrameDetections(frame_index=5, detections=(det,))
     sv_det = detections_to_supervision(frame)
     assert len(sv_det) == 1
-    assert float(sv_det.confidence[0]) == 0.92
+    assert float(sv_det.confidence[0]) == pytest.approx(0.92)
 
     # Simulate ByteTrack output with assigned ID
     tracked = sv.Detections(

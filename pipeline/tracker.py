@@ -339,13 +339,7 @@ class TrackingRunner:
 
     def __init__(self, config: DetectionConfig) -> None:
         self._config = config
-        self._detector = PersonDetector(
-            model_path=config.resolved_model_path(),
-            confidence=config.resolved_confidence(),
-            iou=config.resolved_iou(),
-            person_class_id=config.resolved_person_class_id(),
-            device=config.device,
-        )
+        self._detector = PersonDetector(**config.detector_kwargs())
         self._tracker_cfg = config.load_tracker_yaml()
         self._throttle = FpsThrottle(config.fps_limit)
 

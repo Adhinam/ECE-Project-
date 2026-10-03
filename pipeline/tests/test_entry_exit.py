@@ -19,30 +19,30 @@ from pipeline.tracker import FrameTracks, TrackedVisitor
 from schemas.config import EntryExitLine, StoreLayoutConfig
 
 
-def _vertical_line() -> LineSegment:
+def _horizontal_line() -> LineSegment:
     return LineSegment(
-        p1=(100.0, 100.0),
-        p2=(100.0, 300.0),
+        p1=(50.0, 200.0),
+        p2=(150.0, 200.0),
         line_id="main",
         direction_in="bottom",
     )
 
 
-def test_classify_entry_moving_up_through_vertical_line():
-    line = _vertical_line()
+def test_classify_entry_moving_up_through_horizontal_line():
+    line = _horizontal_line()
     # Outside (below) -> inside (above): y decreases
     direction = classify_crossing((100.0, 250.0), (100.0, 150.0), line)
     assert direction == CrossingDirection.ENTRY
 
 
-def test_classify_exit_moving_down_through_vertical_line():
-    line = _vertical_line()
+def test_classify_exit_moving_down_through_horizontal_line():
+    line = _horizontal_line()
     direction = classify_crossing((100.0, 150.0), (100.0, 250.0), line)
     assert direction == CrossingDirection.EXIT
 
 
 def test_no_crossing_same_side():
-    line = _vertical_line()
+    line = _horizontal_line()
     assert classify_crossing((120.0, 150.0), (130.0, 160.0), line) is None
 
 
@@ -50,7 +50,7 @@ def test_cooldown_prevents_duplicate_entry():
     layout = StoreLayoutConfig(
         store_id="store-001",
         entry_exit_lines=[
-            EntryExitLine(id="main", p1=[100, 100], p2=[100, 300], direction_in="bottom"),
+            EntryExitLine(id="main", p1=[50, 200], p2=[150, 200], direction_in="bottom"),
         ],
     )
     settings = EntryExitSettings(cooldown_frames=50, debounce_frames=0)
@@ -87,7 +87,7 @@ def test_group_crossing_payload():
     layout = StoreLayoutConfig(
         store_id="store-001",
         entry_exit_lines=[
-            EntryExitLine(id="door", p1=[100, 100], p2=[100, 300], direction_in="bottom"),
+            EntryExitLine(id="door", p1=[50, 200], p2=[150, 200], direction_in="bottom"),
         ],
     )
     settings = EntryExitSettings(cooldown_frames=0, debounce_frames=0)
@@ -123,10 +123,8 @@ def test_group_crossing_payload():
         )
     )
     entries = [e for e in events if e.event_type.value == "entry"]
-    if len(entries) >= 2:
-        assert entries[0].payload.get("group_crossing_id") == entries[1].payload.get(
-            "group_crossing_id"
-        )
+    assert len(entries) == 2
+    assert entries[0].payload["group_crossing_id"] == entries[1].payload["group_crossing_id"]
 
 
 def test_line_from_config():

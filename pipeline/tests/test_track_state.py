@@ -36,6 +36,8 @@ def test_track_lifecycle_timeout():
     store.update_frame(1, [], track_ids=[])
     assert store.get(1).status == TrackStatus.LOST
     store.update_frame(2, [], track_ids=[])
+    assert store.get(1).status == TrackStatus.LOST
+    store.update_frame(3, [], track_ids=[])
     assert store.get(1).status == TrackStatus.ENDED
 
 

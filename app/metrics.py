@@ -343,6 +343,7 @@ class StoreMetricsEngine:
 
         conversion_rate = session_metrics.conversion_rate
         has_purchases = session_metrics.has_purchases
+        conversion_confidence = session_metrics.confidence_conversion
         pos_settings = PosSettings()
         pos_txns = load_pos_transactions(
             pos_settings.transactions_path,
@@ -359,7 +360,7 @@ class StoreMetricsEngine:
                 checkout_zone_id=checkout_zone_id,
                 billing_queue_id="checkout-1",
             )
-            converted, _pos_conf = converted_visitors_from_pos(
+            converted, conversion_confidence = converted_visitors_from_pos(
                 transactions=pos_txns,
                 billing_last_seen=billing_last,
                 match_window=timedelta(minutes=pos_settings.match_window_minutes),
@@ -388,7 +389,7 @@ class StoreMetricsEngine:
             pos_transaction_count=pos_transaction_count,
             confidence=StoreMetricsConfidence(
                 unique_visitors=session_metrics.confidence_visitors,
-                conversion_rate=session_metrics.confidence_conversion,
+                conversion_rate=conversion_confidence,
                 abandonment_rate=session_metrics.confidence_abandonment,
                 zone_dwell=zone_conf,
                 queue_depth=queue_conf,

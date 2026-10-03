@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full store intelligence detection pipeline (YOLOv8 + ByteTrack + events → JSONL).
+# Run the full store intelligence detection pipeline (YOLO26 + ByteTrack + events → JSONL).
 #
 # Usage:
 #   ./pipeline/run.sh

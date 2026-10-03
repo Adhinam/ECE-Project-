@@ -109,12 +109,16 @@ def test_emitter_append_only(tmp_path: Path):
     e2 = _sample_event(frame_index=2, event_type=EventType.EXIT)
     assert emitter.emit(e1)
     assert emitter.emit(e2)
+    assert emitter.close() is None  # Batch already flushed at its size limit.
+    path = emitter.current_log_path
+    assert path is not None and path.is_file()
+    first_content = path.read_text(encoding="utf-8")
+    assert len(first_content.splitlines()) == 2
+    assert emitter.emit(_sample_event(frame_index=3))
     stats = emitter.close()
-    assert stats is not None
-    assert stats.events_written == 2
-    assert stats.path.is_file()
-    content = stats.path.read_text(encoding="utf-8")
-    assert content.count("\n") >= 2
+    assert stats is not None and stats.events_written == 1
+    assert path.read_text(encoding="utf-8").startswith(first_content)
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 3
 
 
 def test_emitter_dedup_in_memory():
