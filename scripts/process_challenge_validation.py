@@ -66,7 +66,6 @@ def _run_video(
             "DEGRADE_REID": "false",
             "PIPELINE_FPS_LIMIT": "0",
             "EMIT_CHALLENGE_FORMAT": "true",
-            "MODEL_PATH": str(ROOT / "yolov8n.pt"),
         }
     )
     cmd = [sys.executable, "-m", "pipeline.main", "run"]

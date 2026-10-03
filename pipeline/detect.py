@@ -1,4 +1,4 @@
-"""YOLOv8n person detection — frame-by-frame video processing (no tracking)."""
+"""YOLO person detection — frame-by-frame video processing (no tracking)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 
+import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 
@@ -63,7 +65,7 @@ class VideoDetectionSummary:
 
 class PersonDetector:
     """
-    YOLOv8 person detector — filters to a single class with confidence threshold.
+    YOLO person detector — filters to a single class with confidence threshold.
 
     Tracking is intentionally not implemented; each frame is independent.
     """
@@ -76,11 +78,27 @@ class PersonDetector:
         iou: float,
         person_class_id: int,
         device: str,
+        imgsz: int = 640,
+        cpu_threads: int = 4,
+        clahe: bool = False,
+        clahe_clip: float = 2.0,
+        clahe_tile: int = 8,
     ) -> None:
         self._confidence = confidence
         self._iou = iou
         self._person_class_id = person_class_id
         self._device = device
+        self._imgsz = imgsz
+        if device == "cpu":
+            torch.set_num_threads(cpu_threads)
+            cv2.setNumThreads(cpu_threads)
+        # CLAHE: boosts local contrast for shadowed/distant people
+        # Applied only to luminance (LAB L channel) — preserves colour hues
+        # so HSV histogram features stay consistent across lighting zones.
+        self._clahe = (
+            cv2.createCLAHE(clipLimit=clahe_clip, tileGridSize=(clahe_tile, clahe_tile))
+            if clahe else None
+        )
 
         logger.info(
             "loading_yolo_model",
@@ -99,6 +117,15 @@ class PersonDetector:
         # TODO: optional TensorRT / ONNX export for lower latency in production
         # TODO: batch inference across frames when GPU memory allows
 
+    def _preprocess(self, frame: np.ndarray) -> np.ndarray:
+        """Apply CLAHE to luminance only — improves dark/shadow detection."""
+        if self._clahe is None:
+            return frame
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        l_eq = self._clahe.apply(l)
+        return cv2.cvtColor(cv2.merge([l_eq, a, b]), cv2.COLOR_LAB2BGR)
+
     def detect_frame(self, frame: np.ndarray, frame_index: int) -> FrameDetections:
         """
         Run inference on one BGR frame and return person detections only.
@@ -111,13 +138,15 @@ class PersonDetector:
             FrameDetections with scores and pixel bounding boxes
         """
         t0 = perf_counter()
+        inference_input = self._preprocess(frame)
         try:
             results: list[Results] = self._model.predict(
-                source=frame,
+                source=inference_input,
                 conf=self._confidence,
                 iou=self._iou,
                 classes=[self._person_class_id],
                 device=self._device,
+                imgsz=self._imgsz,
                 verbose=False,
             )
         except Exception as exc:
@@ -170,13 +199,7 @@ class DetectionRunner:
 
     def __init__(self, config: DetectionConfig) -> None:
         self._config = config
-        self._detector = PersonDetector(
-            model_path=config.resolved_model_path(),
-            confidence=config.resolved_confidence(),
-            iou=config.resolved_iou(),
-            person_class_id=config.resolved_person_class_id(),
-            device=config.device,
-        )
+        self._detector = PersonDetector(**config.detector_kwargs())
         self._throttle = FpsThrottle(config.fps_limit)
 
     def run_all(self, video_paths: list[Path]) -> list[VideoDetectionSummary]:
@@ -305,7 +328,7 @@ def cv2_destroy_window_safe() -> None:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="YOLOv8n person detection on MP4 video(s)",
+        description="YOLO person detection on MP4 video(s)",
     )
     parser.add_argument(
         "--source",

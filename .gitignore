@@ -81,3 +81,8 @@ FINAL_GAP_ANALYSIS.md
 FINAL_REVIEWER_WALKTHROUGH.md
 FINAL_SUBMISSION_CHECKLIST.md
 RELEASE_CHECKLIST.md
+# Local review outputs and runtime settings
+data/reviews/
+.runtime/
+Ultralytics/
+*.onnx

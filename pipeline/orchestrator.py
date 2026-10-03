@@ -1,5 +1,5 @@
 """
-Full detection pipeline orchestrator — YOLOv8, ByteTrack, entry/exit, zones, sessions, Re-ID, JSONL.
+Full detection pipeline orchestrator — YOLO26, ByteTrack, entry/exit, zones, sessions, Re-ID, JSONL.
 
 Wires existing stage modules into one frame loop for `python -m pipeline.main run` and `pipeline/run.sh`.
 """
@@ -23,7 +23,7 @@ from pipeline.entry_exit import (
     load_store_layout,
 )
 from pipeline.reid import ReIDSettings, ReentryCoordinator, load_reid_settings
-from pipeline.session import SessionEngine, SessionSettings
+from pipeline.session import SessionEngine, SessionSettings, VisitorSession
 from pipeline.settings import PipelineSettings
 from pipeline.tracker import ByteTrackVisitorTracker
 from pipeline.utils import FpsThrottle, VideoReader
@@ -64,11 +64,13 @@ def _is_staff_track(layout: StoreLayoutConfig, bbox: tuple[int, int, int, int]) 
     return False
 
 
-def _enrich_visitor_payload(event: EventEnvelope, session: SessionEngine) -> EventEnvelope:
+def _enrich_visitor_payload(
+    event: EventEnvelope, session: SessionEngine, completed: VisitorSession | None = None,
+) -> EventEnvelope:
     """Copy active visitor_id into payload after session state is updated."""
     if event.track_id is None:
         return event
-    active = session.get_active_by_track(event.track_id)
+    active = completed or session.get_active_by_track(event.track_id)
     if active is None:
         return event
     payload = dict(event.payload)
@@ -129,13 +131,7 @@ class FullPipelineRunner:
         with reader:
             meta = reader.metadata
             clock = VideoClock(fps=meta.fps or 25.0)
-            detector = PersonDetector(
-                model_path=self._detection.resolved_model_path(),
-                confidence=self._detection.resolved_confidence(),
-                iou=self._detection.resolved_iou(),
-                person_class_id=self._detection.resolved_person_class_id(),
-                device=self._detection.device,
-            )
+            detector = PersonDetector(**self._detection.detector_kwargs())
             tracker = ByteTrackVisitorTracker(
                 tracker_config=self._detection.load_tracker_yaml(),
                 frame_rate=meta.fps or 25.0,
@@ -173,6 +169,8 @@ class FullPipelineRunner:
             throttle = FpsThrottle(self._detection.fps_limit)
             frames_processed = 0
             events_emitted = 0
+            visitor_ids: set[str] = set()
+            last_frame_index = -1
 
             for read_result in reader.frames():
                 if read_result.dropped or read_result.frame is None:
@@ -180,6 +178,7 @@ class FullPipelineRunner:
                 throttle.wait()
                 frame = read_result.frame
                 frame_index = read_result.frame_index
+                last_frame_index = frame_index
 
                 detections = detector.detect_frame(frame, frame_index)
                 frame_tracks = tracker.update(detections)
@@ -224,15 +223,17 @@ class FullPipelineRunner:
                             bbox_xyxy=bbox,
                             exit_event=raw,
                         )
-                    processed.append(_enrich_visitor_payload(raw, session))
+                    processed.append(_enrich_visitor_payload(raw, session, completed))
 
                 for ev in processed:
+                    if ev.global_person_id is not None:
+                        visitor_ids.add(ev.global_person_id)
                     if emitter.emit(ev):
                         events_emitted += 1
 
                 frames_processed += 1
 
-            session.close_all_active(at=clock.timestamp_for_frame(frames_processed))
+            session.close_all_active(at=clock.timestamp_for_frame(last_frame_index + 1))
             emitter.flush()
 
         jsonl_path = emitter.current_log_path
@@ -242,7 +243,7 @@ class FullPipelineRunner:
             frames=frames_processed,
             events=events_emitted,
             jsonl=str(jsonl_path) if jsonl_path else None,
-            visitors=len(session.completed_sessions) + len(session.active_sessions),
+            visitors=len(visitor_ids),
         )
 
         return PipelineRunSummary(
@@ -250,5 +251,5 @@ class FullPipelineRunner:
             frames_processed=frames_processed,
             events_emitted=events_emitted,
             jsonl_path=jsonl_path,
-            unique_visitors=len(session.completed_sessions) + len(session.active_sessions),
+            unique_visitors=len(visitor_ids),
         )

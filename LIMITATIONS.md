@@ -5,7 +5,7 @@ Documented gaps versus the Purplle challenge ideal; each is an explicit trade-of
 ## Dataset and ground truth
 
 - **Challenge ZIP not bundled** — Official clips, `store_layout.json` per store, and `assertions.py` are not in this repo. Use your downloaded dataset under `data/clips/` and point `STORE_LAYOUT_PATH` / `POS_TRANSACTIONS_PATH` accordingly.
-- **Detection accuracy** — YOLOv8n on CPU is a baseline; mAP on real footage is not certified against challenge ground truth without the provided evaluation harness.
+- **Detection accuracy** — YOLO26n on CPU is the current baseline; real-footage accuracy and speed have not been certified. See `docs/VIDEO_REVIEW.md` for evaluation.
 
 ## Pipeline
 
@@ -15,7 +15,7 @@ Documented gaps versus the Purplle challenge ideal; each is an explicit trade-of
 
 ## API and analytics
 
-- **POS correlation** — Matches on `visitor_id` when POS CSV includes it; otherwise time-window proximity to ENTRY (configurable via `POS_MATCH_WINDOW_MINUTES`). Mis-linked POS rows inflate conversion.
+- **POS correlation** — Billing-zone time-window matching only accepts a single eligible visitor. Ambiguous cases remain unresolved; all such estimates are low-confidence and may undercount sales.
 - **Heatmap** — Built from `position_snapshot` and zone events with bbox centroids; sparse cameras yield `data_confidence: low`.
 - **Funnel PURCHASE stage** — Proxied by checkout zone visit or POS match, not SKU-level basket analysis.
 

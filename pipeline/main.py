@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser(
         "detect",
-        help="YOLOv8n person detection (see also: python -m pipeline.detect)",
+        help="YOLO26 person detection (see also: python -m pipeline.detect)",
     )
     subparsers.add_parser(
         "track",
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         "emit",
         help="Event log replay/validate (python -m pipeline.emit)",
     )
-    subparsers.add_parser("run", help="Full pipeline runner (tracking/events — WIP)")
+    subparsers.add_parser("run", help="Full pipeline runner (tracking and retail events)")
 
     # Allow `python -m pipeline.main detect --source ...` by passing detect args through
     if argv and argv[0] == "detect":

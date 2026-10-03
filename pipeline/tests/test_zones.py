@@ -95,10 +95,10 @@ def test_occlusion_grace_delays_exit():
     engine.process_frame(
         FrameTracks(1, (TrackedVisitor(5, (40, 40, 60, 60), 0.9, (50.0, 50.0)),))
     )
-    for idx in range(2, 4):
+    for idx in range(2, 5):
         events = engine.process_frame(FrameTracks(idx, tracks=()))
         assert not any(e.event_type == EventType.ZONE_EXIT for e in events)
-    events = engine.process_frame(FrameTracks(4, tracks=()))
+    events = engine.process_frame(FrameTracks(5, tracks=()))
     assert any(e.event_type == EventType.ZONE_EXIT for e in events)
 
 
@@ -117,8 +117,9 @@ def test_dwell_emitted_after_threshold():
 
     visitor = TrackedVisitor(1, (40, 40, 60, 60), 0.88, (50.0, 50.0))
     engine.process_frame(FrameTracks(0, (visitor,)))
+    events = []
     for idx in range(1, 35):
-        events = engine.process_frame(FrameTracks(idx, (visitor,)))
+        events.extend(engine.process_frame(FrameTracks(idx, (visitor,))))
     dwells = [e for e in events if e.event_type == EventType.ZONE_DWELL]
     assert len(dwells) >= 1
     assert dwells[0].payload["session_sequence"] == 1

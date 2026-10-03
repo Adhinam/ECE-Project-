@@ -37,7 +37,6 @@ def _run_video(store_id: str, camera_id: str, video_path: str) -> None:
             "DEGRADE_REID": "false",
             "PIPELINE_FPS_LIMIT": "0",
             "EMIT_CHALLENGE_FORMAT": "true",
-            "MODEL_PATH": "yolov8n.pt",
         }
     )
     cmd = [sys.executable, "-m", "pipeline.main", "run"]

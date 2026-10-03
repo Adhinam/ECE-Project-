@@ -11,7 +11,7 @@ class PipelineSettings(AppSettings):
     pipeline_video_source: str = "/data/sample/demo.mp4"
     pipeline_store_id: str = "store-001"
     pipeline_camera_id: str = "cam-entrance"
-    pipeline_fps_limit: int = 10
+    pipeline_fps_limit: int = 0  # Offline processing: no artificial sleep.
     enable_reid: bool = False
     enable_gpu: bool = False
     store_layout_path: str = "configs/store_layout.yaml"

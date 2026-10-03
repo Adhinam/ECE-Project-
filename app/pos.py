@@ -6,8 +6,8 @@ POS input schema (no customer identity):
     store_id, transaction_id, timestamp, basket_value_inr
 
 Correlation rule:
-    A visitor who was in the billing zone in the 5-minute window *before* a
-    transaction timestamp counts as a converted visitor for that session.
+    Only an unambiguous billing-window candidate is counted as an estimated
+    conversion. Time proximity alone is never a confirmed purchase.
 """
 
 from __future__ import annotations
@@ -104,8 +104,9 @@ def converted_visitors_from_pos(
     """
     Match POS transactions to visitor sessions using billing-zone presence.
 
-    A visitor is considered converted if they were observed in the billing zone
-    within (txn_time - match_window, txn_time].
+    Conservatively estimate conversion only when exactly one visitor is eligible
+    in the billing window. Ambiguous matches are left unresolved. These estimates
+    are always low-confidence without an explicit transaction/session identity.
     """
     if not transactions:
         return set(), MetricConfidence.UNAVAILABLE
@@ -114,17 +115,16 @@ def converted_visitors_from_pos(
 
     converted: set[str] = set()
     window_s = match_window.total_seconds()
-    for txn in transactions:
-        for visitor_id, last_seen in billing_last_seen.items():
-            delta = (txn.timestamp - last_seen).total_seconds()
-            if 0.0 <= delta <= window_s:
-                converted.add(visitor_id)
-
-    confidence = (
-        MetricConfidence.HIGH
-        if len(transactions) >= 10
-        else MetricConfidence.MEDIUM
-        if len(transactions) >= 3
-        else MetricConfidence.LOW
-    )
-    return converted, confidence
+    seen_transactions: set[tuple[str, str]] = set()
+    for txn in sorted(transactions, key=lambda item: item.timestamp):
+        key = (txn.store_id, txn.transaction_id)
+        if key in seen_transactions:
+            continue
+        seen_transactions.add(key)
+        candidates = [
+            visitor_id for visitor_id, last_seen in billing_last_seen.items()
+            if 0.0 <= (txn.timestamp - last_seen).total_seconds() <= window_s
+        ]
+        if len(candidates) == 1:
+            converted.add(candidates[0])
+    return converted, MetricConfidence.LOW
