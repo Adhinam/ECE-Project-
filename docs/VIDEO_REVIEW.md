@@ -1,3 +1,6 @@
+> Current default: Deep OC-SORT with explicit Re-ID. See [current results and configuration](DEEP_OCSORT_REVIEW.md).
+> The ByteTrack/gallery sections below describe the earlier baseline; use configs/models.bytetrack.yaml to reproduce that backend.
+
 # CPU video review and YOLO26 upgrade
 
 The default detector is YOLO26 Nano (`yolo26n.pt`), with ByteTrack for tracking.

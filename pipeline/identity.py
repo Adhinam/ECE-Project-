@@ -66,7 +66,8 @@ class IdentityMemory:
     def update(self, visitors, image, frame_index):
         now = frame_index / self.fps
         for pid, person in list(self.people.items()):
-            if now - person.last_seen > self.config.identity_memory_seconds:
+            if (self.config.identity_memory_seconds is not None and
+                now - person.last_seen > self.config.identity_memory_seconds):
                 del self.people[pid]
             elif person.state == "visible":
                 person.state = "hidden"
@@ -154,6 +155,11 @@ class IdentityMemory:
                     # Retire the previous raw binding so it cannot duplicate this identity later.
                     self.bindings = {r: p for r, p in self.bindings.items() if p != pid}
                 else:
+                    if self.config.identity_memory_seconds is None and len(self.people) >= self.config.identity_max_entries:
+                        exited = [p for p in self.people.values() if p.state == "exited" and p.person_id not in reserved]
+                        if not exited:
+                            raise RuntimeError("Identity capacity reached: unresolved visits will not be silently forgotten")
+                        del self.people[min(exited, key=lambda p: p.last_seen).person_id]
                     pid = self.next_id
                     self.next_id += 1
                     self.people[pid] = Identity(pid, now, v.centroid)
@@ -171,8 +177,9 @@ class IdentityMemory:
                 person.last_sample = now
             output.append(replace(v, track_id=pid, raw_track_id=raw))
         # Hard bound for long live runs. Visible identities cannot be evicted mid-frame.
-        excess = max(0, len(self.people) - 500)
-        hidden = sorted((p for p in self.people.values() if p.person_id not in reserved),
+        excess = max(0, len(self.people) - self.config.identity_max_entries)
+        hidden = sorted((p for p in self.people.values() if p.person_id not in reserved and
+                         (self.config.identity_memory_seconds is not None or p.state == "exited")),
                         key=lambda p: p.last_seen)
         for p in hidden[:excess]:
             del self.people[p.person_id]

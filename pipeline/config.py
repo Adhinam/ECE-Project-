@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import Field, field_validator
@@ -17,6 +17,10 @@ class TrackerYamlConfig(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
+    tracker_type: Literal["bytetrack", "deepocsort"] = "bytetrack"
+    deep_lost_seconds: float = Field(default=10, gt=0)
+    deep_proximity: float = Field(default=0.1, ge=0, le=1)
+    deep_appearance: float = Field(default=0.75, ge=0, le=1)
     track_thresh: float = Field(default=0.5, ge=0.0, le=1.0)
     match_thresh: float = Field(default=0.8, ge=0.0, le=1.0)
     track_buffer: int = Field(default=30, ge=1, description="ByteTrack lost buffer in 30-FPS reference frames")
@@ -27,7 +31,8 @@ class TrackerYamlConfig(BaseSettings):
     identity_model: str = "yolo26n-reid.onnx"
     identity_similarity: float = Field(default=0.55, ge=0, le=1)
     identity_margin: float = Field(default=0.08, ge=0, le=1)
-    identity_memory_seconds: float = Field(default=300, gt=0)
+    identity_memory_seconds: float | None = Field(default=300, gt=0)
+    identity_max_entries: int = Field(default=500, ge=1)
     identity_sample_seconds: float = Field(default=1, gt=0)
 
 

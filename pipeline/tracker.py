@@ -170,7 +170,9 @@ def supervision_to_tracked_visitors(
 
 class ByteTrackVisitorTracker:
     """
-    Wraps supervision ByteTrack and TrackHistoryStore for stable visitor IDs.
+    Selects Deep OC-SORT or ByteTrack and maintains visitor movement histories.
+
+    The historical class name is kept for compatibility with existing runners.
 
     Optional learned appearance memory maps raw tracks to camera-local person IDs.
     """
@@ -189,10 +191,16 @@ class ByteTrackVisitorTracker:
         self._max_history_points = max_history_points
         self._group_entry_min_size = group_entry_min_size
         self._frame_rate = frame_rate
-        self._byte_track = _create_byte_tracker(tracker_config, frame_rate=frame_rate)
+        self._byte_track = self._new_backend()
         self._history = self._new_history_store()
         self.identity_memory = (IdentityMemory(self._tracker_config, self._frame_rate)
                                 if self._tracker_config.identity_enabled else None)
+
+    def _new_backend(self):
+        if self._tracker_config.tracker_type == "deepocsort":
+            from pipeline.deep_ocsort import DeepOCSortAdapter
+            return DeepOCSortAdapter(self._tracker_config, self._frame_rate)
+        return _create_byte_tracker(self._tracker_config, frame_rate=self._frame_rate)
 
     @property
     def history_store(self) -> TrackHistoryStore:
@@ -208,7 +216,7 @@ class ByteTrackVisitorTracker:
     def reset(self) -> None:
         """Reset per-video state (new ByteTrack instance + empty history)."""
         # TODO: reuse Kalman state if supervision exposes reset API
-        self._byte_track = _create_byte_tracker(self._tracker_config, frame_rate=self._frame_rate)
+        self._byte_track = self._new_backend()
         self._history = self._new_history_store()
         self.identity_memory = (IdentityMemory(self._tracker_config, self._frame_rate)
                                 if self._tracker_config.identity_enabled else None)
@@ -220,11 +228,13 @@ class ByteTrackVisitorTracker:
         Occlusion recovery is handled by ByteTrack's lost-track buffer plus our
         LOST → ACTIVE transition when the same track_id reappears.
         """
-        if self.identity_memory is not None and image is None:
+        if (self.identity_memory is not None or self._tracker_config.tracker_type == "deepocsort") and image is None:
             raise ValueError("Appearance identity recovery requires the original video frame")
         t0 = perf_counter()
         sv_det = detections_to_supervision(frame)
-        tracked = self._byte_track.update_with_detections(sv_det)
+        tracked = (self._byte_track.update_with_detections(sv_det, image)
+                   if self._tracker_config.tracker_type == "deepocsort"
+                   else self._byte_track.update_with_detections(sv_det))
 
         visitors = supervision_to_tracked_visitors(tracked, frame_index=frame.frame_index)
         if self.identity_memory is not None:

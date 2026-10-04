@@ -14,11 +14,7 @@ detector:
   person_class_id: 0
 
 tracker:
-  tracker_type: deepocsort
-  deep_lost_seconds: 10
-  deep_proximity: 0.1
-  deep_appearance: 0.75
-  track_thresh: 0.3
+  track_thresh: 0.5
   match_thresh: 0.8
   # Supervision scales this by source FPS / 30: 120 means about 4 seconds.
   track_buffer: 120
@@ -27,13 +23,12 @@ tracker:
   identity_model: yolo26n-reid.onnx
   identity_similarity: 0.55
   identity_margin: 0.08
-  identity_memory_seconds: null  # Retain unresolved visits until confirmed exit or run reset.
-  identity_max_entries: 500
+  identity_memory_seconds: 300
   identity_sample_seconds: 1
 
 reid:
   enabled: true
-  # Lightweight HSV histogram Re-ID (pipeline/reid.py) — not OSNet training
+  # Lightweight HSV histogram Re-ID (pipeline/reid.py) â€” not OSNet training
   similarity_threshold: 0.72
   histogram_weight: 0.5
   cosine_weight: 0.5

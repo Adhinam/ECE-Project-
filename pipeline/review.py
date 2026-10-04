@@ -43,6 +43,7 @@ def review_video(
     model: str | None = None,
     imgsz: int | None = None,
     max_seconds: float = 60,
+    start_seconds: float = 0,
     save_video: bool = True,
     threads: int = 4,
     models_config: Path = Path("configs/models.yaml"),
@@ -52,8 +53,8 @@ def review_video(
     The output is a tracking review, not a calibrated entry/exit accuracy score.
     A new directory is required so prior evidence cannot be overwritten.
     """
-    if max_seconds <= 0 or threads < 1:
-        raise ValueError("max_seconds and threads must be positive")
+    if not np.isfinite(max_seconds) or not np.isfinite(start_seconds) or max_seconds <= 0 or start_seconds < 0 or threads < 1:
+        raise ValueError("max_seconds and threads must be positive; start_seconds must be finite and nonnegative")
     if imgsz is not None and (imgsz < 32 or imgsz % 32):
         raise ValueError("imgsz must be a positive multiple of 32")
     if not source.is_file():
@@ -86,6 +87,7 @@ def review_video(
     with (
         VideoReader(source) as reader,
         (output / "frames.csv").open("w", newline="", encoding="utf-8") as frame_log,
+        (output / "detections.jsonl").open("w", encoding="utf-8") as detection_log,
         (output / "tracks.jsonl").open("w", encoding="utf-8") as track_log,
     ):
         meta = reader.metadata
@@ -113,8 +115,10 @@ def review_video(
         loop_started = perf_counter()
         try:
             for item in reader.frames():
-                if item.frame_index / meta.fps >= max_seconds:
+                if item.frame_index / meta.fps >= start_seconds + max_seconds:
                     break
+                if item.frame_index / meta.fps < start_seconds:
+                    continue
                 if item.frame is None or item.dropped:
                     continue
                 if frames == 0:
@@ -133,6 +137,7 @@ def review_video(
                             raise RuntimeError("Cannot create annotated MP4 with this OpenCV build")
                     loop_started = perf_counter()
                 detections = detector.detect_frame(item.frame, item.frame_index)
+                detection_log.write(json.dumps(asdict(detections)) + "\n")
                 tracks = tracker.update(detections, item.frame)
                 inference_times.append(float(detections.inference_ms or 0))
                 tracking_times.append(float(tracks.tracking_ms or 0))
@@ -169,7 +174,7 @@ def review_video(
             "source": str(source.resolve()),
             "detector": kwargs,
             "tracker": {
-                "type": "ByteTrack",
+                "type": cfg.load_tracker_yaml().tracker_type,
                 **cfg.load_tracker_yaml().model_dump(),
                 "frame_rate": meta.fps,
             },
@@ -184,6 +189,7 @@ def review_video(
             "source_fps": meta.fps,
             "source_resolution": [meta.width, meta.height],
             "max_seconds": max_seconds,
+            "start_seconds": start_seconds,
             "frames_processed": frames,
             "frames_dropped": reader.stats.frames_dropped,
             "model_load_seconds": model_load_seconds,
@@ -238,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--model", help="Pretrained name or weights; default from models.yaml")
     parser.add_argument("--imgsz", type=int, default=None)
+    parser.add_argument("--start-seconds", type=float, default=0)
     parser.add_argument("--max-seconds", type=float, default=60)
     parser.add_argument("--threads", type=int, default=min(4, os.cpu_count() or 1))
     parser.add_argument("--models-config", type=Path, default=Path("configs/models.yaml"))
@@ -252,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             imgsz=args.imgsz,
             max_seconds=args.max_seconds,
+            start_seconds=args.start_seconds,
             threads=args.threads,
             models_config=args.models_config,
             save_video=not args.no_video,

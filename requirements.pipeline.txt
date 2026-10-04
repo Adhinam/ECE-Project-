@@ -17,3 +17,6 @@ psutil>=7,<8
 
 # CPU appearance encoder for occlusion recovery
 onnxruntime==1.30.0
+
+# Ultralytics tracker assignment solver
+lap==0.5.13

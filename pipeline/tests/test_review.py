@@ -72,6 +72,13 @@ def test_review_writes_video_csv_and_honest_report(tmp_path, monkeypatch):
     assert cap.get(cv2.CAP_PROP_FPS) == pytest.approx(10)
     assert cap.get(cv2.CAP_PROP_FRAME_COUNT) == 10
     cap.release()
+    offset = tmp_path / "offset"
+    offset_report = review_video(source, offset, start_seconds=0.5, max_seconds=0.5, save_video=False)
+    with (offset / "frames.csv").open() as fh:
+        assert [int(r["frame_index"]) for r in csv.DictReader(fh)] == [5, 6, 7, 8, 9]
+    assert offset_report["frames_processed"] == 5
+    assert offset_report["start_seconds"] == 0.5
+    assert len((offset / "detections.jsonl").read_text().splitlines()) == 5
     with pytest.raises(FileExistsError):
         review_video(source, output)
 
