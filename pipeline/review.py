@@ -8,6 +8,7 @@ import json
 import os
 import platform
 from datetime import UTC, datetime
+from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
 from time import perf_counter
@@ -85,6 +86,7 @@ def review_video(
     with (
         VideoReader(source) as reader,
         (output / "frames.csv").open("w", newline="", encoding="utf-8") as frame_log,
+        (output / "tracks.jsonl").open("w", encoding="utf-8") as track_log,
     ):
         meta = reader.metadata
         if not np.isfinite(meta.fps) or meta.fps <= 0:
@@ -103,6 +105,7 @@ def review_video(
                 "detections",
                 "tracked_people",
                 "track_ids",
+                "raw_track_ids",
                 "detector_ms",
                 "tracker_ms",
             ]
@@ -130,9 +133,11 @@ def review_video(
                             raise RuntimeError("Cannot create annotated MP4 with this OpenCV build")
                     loop_started = perf_counter()
                 detections = detector.detect_frame(item.frame, item.frame_index)
-                tracks = tracker.update(detections)
+                tracks = tracker.update(detections, item.frame)
                 inference_times.append(float(detections.inference_ms or 0))
                 tracking_times.append(float(tracks.tracking_ms or 0))
+                track_log.write(json.dumps({"frame_index": item.frame_index,
+                    "tracks": [asdict(v) for v in tracks.tracks]}) + "\n")
                 ids = [visitor.track_id for visitor in tracks.tracks]
                 track_ids.update(ids)
                 maximum_people_in_frame = max(maximum_people_in_frame, len(ids))
@@ -143,6 +148,7 @@ def review_video(
                         len(detections.detections),
                         len(ids),
                         json.dumps(ids),
+                        json.dumps([v.raw_track_id or v.track_id for v in tracks.tracks]),
                         inference_times[-1],
                         tracking_times[-1],
                     ]
@@ -189,18 +195,30 @@ def review_video(
             "tracker_timing": summarize_timings(tracking_times),
             "peak_sampled_process_ram_mib": peak_sampled_rss / 1024**2,
             "distinct_track_ids_not_unique_visitors": len(track_ids),
+            "identity_recovery": {
+                "enabled": tracker.identity_memory is not None,
+                "raw_track_count": len(tracker.identity_memory.raw_ids) if tracker.identity_memory else len(track_ids),
+                "recoveries": sum(e["action"] == "recovered" for e in tracker.identity_memory.events) if tracker.identity_memory else 0,
+                "exit_calibrated": False,
+            },
             "maximum_tracked_people_in_frame": maximum_people_in_frame,
             "annotated_video": str(video_path.resolve()) if save_video else None,
             "accuracy_status": "Not measured: requires manual labels and camera calibration",
             "measurement_notes": [
                 "Detector timing includes preprocessing and prediction; no website or database.",
                 "Loop FPS includes tracking, decoding after first frame, CSV and video output.",
-                "Model loading and three warm-up predictions are excluded from loop FPS.",
+                "Detector loading and three warm-up predictions are excluded from loop FPS.",
+                "Appearance encoder initialization, when enabled, is included in loop FPS.",
                 "RAM is sampled per frame, includes the whole process, and may miss brief peaks.",
                 "Track IDs can fragment or switch; their count is not a unique-customer count.",
                 "Offline throughput does not prove live-stream latency or retail-event accuracy.",
             ],
         }
+    if tracker.identity_memory is not None:
+        (output / "identity_events.json").write_text(
+            json.dumps(tracker.identity_memory.events, indent=2), encoding="utf-8")
+        (output / "identity_candidates.json").write_text(
+            json.dumps(tracker.identity_memory.candidate_log, indent=2), encoding="utf-8")
     (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     (output / "REVIEW.md").write_text(
         f"# Video review\n\nModel: `{kwargs['model_path']}` on CPU.\n\n"

@@ -181,7 +181,7 @@ class FullPipelineRunner:
                 last_frame_index = frame_index
 
                 detections = detector.detect_frame(frame, frame_index)
-                frame_tracks = tracker.update(detections)
+                frame_tracks = tracker.update(detections, frame)
 
                 frame_events: list[EventEnvelope] = []
                 frame_events.extend(entry_exit.process_frame(frame_tracks))
@@ -215,6 +215,8 @@ class FullPipelineRunner:
                             processed.append(_enrich_visitor_payload(reentry_ev, session))
                             continue
 
+                    if raw.event_type == EventType.EXIT and tracker.identity_memory is not None:
+                        tracker.identity_memory.mark_exited(raw.track_id)
                     completed = session.process_event(raw)
                     if raw.event_type == EventType.EXIT and completed and reentry_coord:
                         reentry_coord.on_visitor_exit(

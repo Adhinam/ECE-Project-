@@ -16,7 +16,15 @@ detector:
 tracker:
   track_thresh: 0.5
   match_thresh: 0.8
-  track_buffer: 30
+  # Supervision scales this by source FPS / 30: 120 means about 4 seconds.
+  track_buffer: 120
+  new_track_thresh: 0.6
+  identity_enabled: true
+  identity_model: yolo26n-reid.onnx
+  identity_similarity: 0.55
+  identity_margin: 0.08
+  identity_memory_seconds: 300
+  identity_sample_seconds: 1
 
 reid:
   enabled: true

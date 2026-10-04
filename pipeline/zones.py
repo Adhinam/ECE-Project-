@@ -656,7 +656,7 @@ class ZoneTrackingRunner:
                     read_result.frame,
                     read_result.frame_index,
                 )
-                frame_tracks = byte_tracker.update(detections)
+                frame_tracks = byte_tracker.update(detections, read_result.frame)
                 frames_processed += 1
 
                 events = engine.process_frame(frame_tracks)

@@ -16,6 +16,7 @@ import supervision as sv
 
 from pipeline.config import DetectionConfig, TrackerYamlConfig
 from pipeline.detect import FrameDetections, PersonDetector
+from pipeline.identity import IdentityMemory
 from pipeline.track_state import (
     GroupEntryCandidate,
     TrackHistoryStore,
@@ -49,6 +50,7 @@ class TrackedVisitor:
     confidence: float
     centroid: tuple[float, float]
     class_id: int = 0
+    raw_track_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -113,7 +115,10 @@ def _create_byte_tracker(cfg: TrackerYamlConfig, *, frame_rate: float) -> sv.Byt
     for kwargs in attempts:
         try:
             logger.info("byte_track_initialized", **kwargs)
-            return sv.ByteTrack(**kwargs)
+            tracker = sv.ByteTrack(**kwargs)
+            if cfg.new_track_thresh is not None:
+                tracker.det_thresh = cfg.new_track_thresh
+            return tracker
         except TypeError as exc:
             last_error = exc
             logger.warning("byte_track_init_retry", error=str(exc), kwargs=kwargs)
@@ -167,7 +172,7 @@ class ByteTrackVisitorTracker:
     """
     Wraps supervision ByteTrack and TrackHistoryStore for stable visitor IDs.
 
-    Re-identification is not used; track_id comes from ByteTrack only.
+    Optional learned appearance memory maps raw tracks to camera-local person IDs.
     """
 
     def __init__(
@@ -186,6 +191,8 @@ class ByteTrackVisitorTracker:
         self._frame_rate = frame_rate
         self._byte_track = _create_byte_tracker(tracker_config, frame_rate=frame_rate)
         self._history = self._new_history_store()
+        self.identity_memory = (IdentityMemory(self._tracker_config, self._frame_rate)
+                                if self._tracker_config.identity_enabled else None)
 
     @property
     def history_store(self) -> TrackHistoryStore:
@@ -203,20 +210,26 @@ class ByteTrackVisitorTracker:
         # TODO: reuse Kalman state if supervision exposes reset API
         self._byte_track = _create_byte_tracker(self._tracker_config, frame_rate=self._frame_rate)
         self._history = self._new_history_store()
+        self.identity_memory = (IdentityMemory(self._tracker_config, self._frame_rate)
+                                if self._tracker_config.identity_enabled else None)
 
-    def update(self, frame: FrameDetections) -> FrameTracks:
+    def update(self, frame: FrameDetections, image: np.ndarray | None = None) -> FrameTracks:
         """
         Run ByteTrack on detections and update movement history.
 
         Occlusion recovery is handled by ByteTrack's lost-track buffer plus our
         LOST → ACTIVE transition when the same track_id reappears.
         """
+        if self.identity_memory is not None and image is None:
+            raise ValueError("Appearance identity recovery requires the original video frame")
         t0 = perf_counter()
         sv_det = detections_to_supervision(frame)
         tracked = self._byte_track.update_with_detections(sv_det)
-        tracking_ms = (perf_counter() - t0) * 1000.0
 
         visitors = supervision_to_tracked_visitors(tracked, frame_index=frame.frame_index)
+        if self.identity_memory is not None:
+            visitors = self.identity_memory.update(visitors, image, frame.frame_index)
+        tracking_ms = (perf_counter() - t0) * 1000.0
         points: list[TrackPoint] = []
         tids: list[int] = []
         for v in visitors:
@@ -408,7 +421,7 @@ class TrackingRunner:
                     read_result.frame,
                     read_result.frame_index,
                 )
-                frame_tracks = tracker.update(detections)
+                frame_tracks = tracker.update(detections, read_result.frame)
                 frames_processed += 1
                 total_track_instances += len(frame_tracks.tracks)
                 group_entries += len(frame_tracks.group_entries)
@@ -484,7 +497,7 @@ class TrackingRunner:
                     read_result.frame,
                     read_result.frame_index,
                 )
-                yield tracker.update(detections)
+                yield tracker.update(detections, read_result.frame)
 
 
 def _destroy_window_safe() -> None:

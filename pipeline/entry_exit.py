@@ -110,6 +110,7 @@ class TrackLineState:
     """Per (track, line) crossing state for debounce and cooldown."""
 
     last_centroid: tuple[float, float] | None = None
+    last_observed_frame: int | None = None
     last_side: int = 0
     stable_side: int = 0
     stable_side_frames: int = 0
@@ -339,6 +340,12 @@ class EntryExitDetector:
             for line in self._lines:
                 state = self._state(visitor.track_id, line.line_id)
                 curr_side = _side_from_sign(_cross_sign(line, curr))
+                # Re-ID jumps across an unobserved path are not observed door crossings.
+                if state.last_observed_frame is not None and frame_index - state.last_observed_frame > 2:
+                    state.last_centroid = None
+                    state.armed = False
+                    state.stable_side_frames = 0
+                state.last_observed_frame = frame_index
 
                 if state.last_centroid is not None:
                     prev = state.last_centroid
@@ -627,10 +634,14 @@ class EntryExitRunner:
                     read_result.frame,
                     read_result.frame_index,
                 )
-                frame_tracks = byte_tracker.update(detections)
+                frame_tracks = byte_tracker.update(detections, read_result.frame)
                 frames_processed += 1
 
                 events = detector.process_frame(frame_tracks)
+                if byte_tracker.identity_memory is not None:
+                    for event in events:
+                        if event.event_type == EventType.EXIT:
+                            byte_tracker.identity_memory.mark_exited(event.track_id)
                 for ev in events:
                     all_events.append(ev)
                     if ev.event_type == EventType.ENTRY:

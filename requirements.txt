@@ -33,3 +33,6 @@ plotly>=5.20,<6
 
 # Local benchmark process memory measurement
 psutil>=7,<8
+
+# CPU appearance encoder for occlusion recovery
+onnxruntime==1.30.0

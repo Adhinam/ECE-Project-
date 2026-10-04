@@ -86,3 +86,6 @@ data/reviews/
 .runtime/
 Ultralytics/
 *.onnx
+
+# Local camera footage and review outputs
+sample_video/

@@ -130,3 +130,13 @@ def test_group_crossing_payload():
 def test_line_from_config():
     seg = line_from_config(EntryExitLine(id="x", p1=[0, 0], p2=[10, 10], direction_in="left"))
     assert seg.line_id == "x"
+
+
+def test_recovered_identity_does_not_invent_crossing_across_missing_frames():
+    layout = StoreLayoutConfig(store_id="s", entry_exit_lines=[
+        EntryExitLine(id="door", p1=[50, 200], p2=[150, 200], direction_in="bottom")])
+    detector = EntryExitDetector(layout, EntryExitSettings(debounce_frames=0),
+                                 camera_id="c", clock=VideoClock(fps=13))
+    detector.process_frame(FrameTracks(0, (TrackedVisitor(1, (90,240,110,260), .9, (100,250)),)))
+    events = detector.process_frame(FrameTracks(30, (TrackedVisitor(1, (90,140,110,160), .9, (100,150)),)))
+    assert not events

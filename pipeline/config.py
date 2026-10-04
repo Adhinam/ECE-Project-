@@ -19,8 +19,16 @@ class TrackerYamlConfig(BaseSettings):
 
     track_thresh: float = Field(default=0.5, ge=0.0, le=1.0)
     match_thresh: float = Field(default=0.8, ge=0.0, le=1.0)
-    track_buffer: int = Field(default=30, ge=1, description="ByteTrack lost_track_buffer (frames)")
+    track_buffer: int = Field(default=30, ge=1, description="ByteTrack lost buffer in 30-FPS reference frames")
     frame_rate: int = Field(default=30, ge=1)
+    new_track_thresh: float | None = Field(default=None, ge=0, le=1)
+    identity_enabled: bool = False
+    identity_confirm_frames: int = Field(default=3, ge=1)
+    identity_model: str = "yolo26n-reid.onnx"
+    identity_similarity: float = Field(default=0.55, ge=0, le=1)
+    identity_margin: float = Field(default=0.08, ge=0, le=1)
+    identity_memory_seconds: float = Field(default=300, gt=0)
+    identity_sample_seconds: float = Field(default=1, gt=0)
 
 
 class DetectorYamlConfig(BaseSettings):

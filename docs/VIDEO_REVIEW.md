@@ -80,7 +80,7 @@ must not be treated as valid for arbitrary footage.
 - Removed batch-script YOLOv8 overrides and the default offline FPS sleep cap.
   Existing personal `.env` files can still override the cap: use `PIPELINE_FPS_LIMIT=0`.
 - Low-confidence detections reach ByteTrack's second association pass; the higher
-  track-activation threshold remains 0.5. Thresholds need footage validation.
+  association threshold is 0.50 and new-track threshold is 0.60. Thresholds need footage validation.
 - EXIT events retain the session identity after closure; run summaries count
   distinct visitor IDs instead of sessions. End timestamps use source-frame position.
 - POS matching rejects ambiguous billing-window candidates and remains low-confidence.
@@ -113,4 +113,55 @@ The upgrade was checked on Windows with Python 3.14, Ultralytics 8.4.172,
 Supervision 0.27.0.post2, and PyTorch 2.14.1. Automated tests passed and the real
 YOLO26 Nano weights processed a short blank synthetic clip through both runners.
 Synthetic footage only verifies execution and file output; it is not an accuracy
-or representative CCTV performance benchmark. No user CCTV sample has been evaluated yet.
+or representative CCTV performance benchmark. The local sample review is documented below.
+
+
+## Appearance memory and occlusion recovery
+
+`tracker.identity_enabled: true` enables a camera-local identity gallery in every
+ByteTrack runner, including `pipeline.review`. It uses the dedicated
+`yolo26n-reid.onnx` encoder with ONNX Runtime on CPU. This is separate from the
+older optional histogram-based exit/re-entry coordinator. See the
+[official encoder documentation](https://docs.ultralytics.com/modes/track/).
+Weights download on first use; they are not committed. Install requirements.pipeline.txt.
+
+The detector retains scores above 0.10. ByteTrack uses scores above 0.50 for its
+first association pass, but requires 0.60 to create a raw track. A new identity
+must persist for at least three observations, with a usable appearance crop;
+a track without a usable crop waits up to one source second. This delays new
+labels slightly and suppresses brief detections. Fully hidden people cannot be
+detected; their identity stays in memory rather than drawing an invented box.
+
+The 120-frame ByteTrack buffer is expressed at a 30 FPS reference rate:
+at this clip's 13 FPS it retains about 52 missing frames (four seconds).
+The appearance gallery retains missing identities for 300 source-video seconds,
+with up to eight samples each and 500 retained people. Expiry means forgotten,
+not confirmed exit. Only a calibrated outward line crossing marks an exit.
+Unobserved jumps across a line do not generate entry/exit events.
+
+Recovery requires sufficient cosine similarity, a margin over the next candidate,
+a plausible time/distance relationship, and a unique assignment. Visible people
+are excluded from recovery candidates. Weak, very flat, and heavily overlapping crops do not
+update appearance. These checks reduce false merges but can leave fragmented IDs.
+ByteTrack can still switch existing IDs at crossings; this layer does not certify
+continuous identity, and matching clothing is not proof that two people are the same.
+
+`frames.csv` retains person IDs and underlying raw track IDs; `tracks.jsonl` saves
+boxes and both IDs. `identity_events.json` records new/recovered assignments and
+`identity_candidates.json` records candidate similarities for manual review.
+The number of resulting identities is never reported as a verified customer count.
+Store footage and generated outputs remain local under `sample_video/output/`.
+
+
+For a visual recovery audit, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/review_identity_pairs.py sample_video/output/reid_final
+```
+
+This creates `recovery_pairs.jpg` and an initially unreviewed `pair_review.json`.
+Inspect complete video context as well as crops before marking a pair consistent.
+The sample's similarity threshold (0.55) and margin (0.08) are preliminary,
+selected using this same clip, not validated on a held-out dataset. A visually
+consistent match is not a measured IDF1 score. Do not deploy these parameters
+unchanged to other cameras without checking both missed matches and false merges.
