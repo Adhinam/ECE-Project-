@@ -21,6 +21,8 @@ class TrackerYamlConfig(BaseSettings):
     deep_lost_seconds: float = Field(default=10, gt=0)
     deep_proximity: float = Field(default=0.1, ge=0, le=1)
     deep_appearance: float = Field(default=0.75, ge=0, le=1)
+    deep_appearance_weight: float = Field(default=0, ge=0, le=1)
+    deep_reject_similarity: float = Field(default=0.1, ge=-1, le=1)
     track_thresh: float = Field(default=0.5, ge=0.0, le=1.0)
     match_thresh: float = Field(default=0.8, ge=0.0, le=1.0)
     track_buffer: int = Field(default=30, ge=1, description="ByteTrack lost buffer in 30-FPS reference frames")
@@ -34,6 +36,8 @@ class TrackerYamlConfig(BaseSettings):
     identity_memory_seconds: float | None = Field(default=300, gt=0)
     identity_max_entries: int = Field(default=500, ge=1)
     identity_sample_seconds: float = Field(default=1, gt=0)
+    identity_recovery_frames: int = Field(default=3, ge=1, description="Consecutive clear appearance matches before recovering an ID")
+    identity_new_wait_seconds: float = Field(default=0.8, ge=0, description="Extra evidence window for new raw tracks near missing identities")
 
 
 class DetectorYamlConfig(BaseSettings):

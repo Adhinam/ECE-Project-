@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Store Intelligence · Zone Editor</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101827;color:#eef3ff;font:15px system-ui,sans-serif}header{padding:24px 32px;border-bottom:1px solid #344056}h1{margin:0 0 6px;font-size:26px}p{color:#b9c6db;line-height:1.5;margin:6px 0}main{display:grid;grid-template-columns:310px minmax(0,1fr);gap:24px;padding:24px}aside,.viewer{background:#192438;border:1px solid #344056;border-radius:14px;padding:20px}label{display:block;margin:14px 0 6px;color:#cad5e8}input,select,button{font:inherit;border-radius:7px;border:1px solid #4b5a73;padding:10px;background:#101827;color:#eef3ff}input,select{width:100%}button{cursor:pointer}button:hover{background:#30425f}button.primary{background:#147b69;border-color:#269e88}button:disabled{opacity:.45;cursor:default}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.stage{position:relative;margin:18px 0;background:#0b1120;min-height:180px}canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}video{display:none}.empty{padding:50px;text-align:center}.hint{font-size:13px}#status{min-height:24px;color:#8de1ca;margin-top:14px}.item{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #344056}.item button:first-child{flex:1;text-align:left;overflow-wrap:anywhere}.item.active button:first-child{border-color:#6fe4c6}#seek{flex:1;width:auto}#time{font-variant-numeric:tabular-nums}a{color:#8de1ca}details{margin-top:20px}summary{cursor:pointer}kbd{border:1px solid #4b5a73;padding:1px 4px;border-radius:4px}@media(max-width:850px){main{grid-template-columns:1fr;padding:12px}header{padding:20px}}
+</style></head><body>
+<header><h1>Camera zone editor</h1><p>Choose a video. Mark your doorway and store sections. Download a layout ready for Store Intelligence.</p></header>
+<main><aside>
+<label for="videoFile">1 · Choose a local video</label><input id="videoFile" type="file" accept="video/*"><p class="hint">Your video stays in this browser. MP4 is recommended; other formats depend on browser support.</p>
+<label for="store">Store ID</label><input id="store" value="store-001" maxlength="100">
+<label for="kind">2 · What are you marking?</label><select id="kind"><option value="zones">Section / zone</option><option value="entry_exit_lines">Entry / exit doorway</option><option value="queues">Billing queue</option><option value="staff_areas">Staff area</option></select>
+<label for="name">Name</label><input id="name" placeholder="e.g. dairy, produce, main-door" maxlength="100">
+<label for="capacity">Queue capacity</label><input id="capacity" type="number" min="1" max="10000" value="20">
+<div class="row"><button id="new" class="primary">Start drawing</button><button id="finish">Finish shape</button><button id="undo">Undo</button><button id="cancel">Cancel drawing</button></div>
+<p id="instruction" class="hint">Click Start drawing, then click each corner of the section. Finish shape closes the polygon.</p>
+<label for="dwell">Dwell threshold (seconds)</label><input id="dwell" type="number" min="0" max="86400" value="30">
+<div class="row"><button id="export" class="primary">Save layout JSON…</button></div><label for="importFile">Open an existing layout JSON</label><input id="importFile" type="file" accept=".json,application/json"><p class="hint">This opens a previously saved .json file. To save a new layout, use “Save layout JSON…” above.</p>
+<p id="status" role="status" aria-live="polite"></p>
+<details><summary>How to use this layout</summary><p class="hint">Save the JSON into the project's configs folder. Set STORE_LAYOUT_PATH to that file, PIPELINE_VIDEO_SOURCE to your original video, and PIPELINE_STORE_ID to the Store ID above before running the pipeline.</p><p class="hint">Use one layout per fixed camera view. If the camera moves, zooms, or changes resolution, recalibrate. Draw the doorway across the tracked person's centre path: the current pipeline uses box centres.</p></details>
+</aside><section class="viewer"><div class="row"><button id="play">Play / pause</button><input id="seek" aria-label="Video position" type="range" min="0" max="0" step="0.01" value="0"><span id="time">0:00</span></div>
+<p class="hint">Pause on a clear frame to draw. Select a saved shape below, then drag its corners to adjust. <kbd>Enter</kbd> finishes · <kbd>Escape</kbd> cancels.</p>
+<div class="stage"><div id="empty" class="empty">Choose a video to start marking zones.</div><canvas id="canvas" hidden></canvas></div><video id="video" muted playsinline preload="auto"></video>
+<h2 style="font-size:18px">Your sections and doorways</h2><div id="items"></div><p class="hint">The green arrow on a doorway points INTO the store. Place the line inside the visible walkway, where a person's centre can be seen on BOTH sides—not against the image border. Select a doorway to flip its arrow or move it inward.</p><button id="flip">Flip entry direction</button> <button id="insetDoor">Move doorway inward</button><p id="calibrationHint" class="hint" style="color:#ffd18c"></p>
+</section></main>
+<section id="processing" class="viewer" style="margin:0 24px 24px">
+<h2>Process video &amp; view results</h2><p id="backendHint">To run the model, open start-zone-app.cmd in the project folder. It opens this editor as a local processing website.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+<div><label for="outputFolder">Save results into this folder</label><input id="outputFolder" value="sample_video/output/app_runs"><p class="hint">A new run folder is created here automatically. Relative paths start at the project folder.</p></div>
+<div><label for="cameraId">Camera ID</label><input id="cameraId" value="camera-1" maxlength="100"><label for="previousRuns">Open a saved run</label><select id="previousRuns"><option value="">Choose a saved run…</option></select></div></div>
+<div class="row"><button id="processVideo" class="primary" disabled>Save &amp; process video</button><button id="refreshRuns" disabled>Refresh saved runs</button></div>
+<p id="processingStatus" role="status" aria-live="polite"></p><progress id="runProgress" value="0" max="100" style="width:100%"></progress><p id="savedPath" class="hint" style="overflow-wrap:anywhere"></p>
+<div id="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:20px 0"></div>
+<p id="reportNote" class="hint"></p>
+<div id="outputPlayer" hidden><h3>Processed video</h3><video id="resultVideo" controls playsinline preload="metadata" style="display:block;width:100%;max-height:650px;background:#080d16"></video><p class="hint">The annotated output has no audio. It becomes playable here after processing finishes.</p><div id="resultDownloads" class="row"></div></div>
+<div class="row"><label for="filterId">Filter ID</label><input id="filterId" placeholder="All IDs" style="width:140px"><label for="filterZone">Filter zone</label><select id="filterZone" style="width:200px"><option value="">All zones</option></select></div>
+<h3>Entry / exit history</h3><div id="crossingTable" style="overflow:auto"></div>
+<h3>Total time per ID and zone</h3><div id="totalsTable" style="overflow:auto"></div>
+<h3>Individual zone visits</h3><div id="visitsTable" style="overflow:auto"></div>
+</section><script src="editor.js"></script><script src="processing.js"></script></body></html>

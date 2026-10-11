@@ -61,7 +61,7 @@ def test_review_writes_video_csv_and_honest_report(tmp_path, monkeypatch):
     assert report["distinct_track_ids_not_unique_visitors"] == 0
     assert report["detector_timing"]["fps"] == 100
     assert observed[0]["imgsz"] == 320
-    assert observed[0]["model_path"] == "yolo26n.pt"
+    assert observed[0]["model_path"] == "yolo26s.pt"
     assert "Not measured" in report["accuracy_status"]
     assert json.loads((output / "report.json").read_text())["frames_processed"] == 10
     with (output / "frames.csv").open() as fh:

@@ -1,11 +1,38 @@
 import numpy as np
 import pytest
 import supervision as sv
+from types import SimpleNamespace
 
 from pipeline.config import TrackerYamlConfig
 from pipeline.deep_ocsort import DeepOCSortAdapter
 from pipeline.identity import IdentityMemory
 from pipeline.tracker import TrackedVisitor
+
+
+def test_appearance_can_penalize_overlap_with_the_wrong_person():
+    adapter = DeepOCSortAdapter(TrackerYamlConfig(deep_appearance_weight=.55), 13)
+    track = SimpleNamespace(smooth_feat=np.array([1., 0., 0.]))
+    wrong = SimpleNamespace(curr_feat=np.array([.4, np.sqrt(.84), 0.]), score=.9)
+    right = SimpleNamespace(curr_feat=np.array([.7, 0., np.sqrt(.51)]), score=.9)
+    costs = adapter.backend._fuse_appearance(np.array([[.05, .3]]), [track], [wrong, right],
+                                              np.array([[.05, .3]]))
+    assert costs[0, 1] < costs[0, 0]
+
+
+def test_missing_features_keep_motion_matching_available():
+    adapter = DeepOCSortAdapter(TrackerYamlConfig(deep_appearance_weight=.55), 13)
+    track = SimpleNamespace(smooth_feat=None)
+    detection = SimpleNamespace(curr_feat=None, score=.9)
+    costs = adapter.backend._fuse_appearance(np.array([[.2]]), [track], [detection], np.array([[.2]]))
+    assert costs[0, 0] == pytest.approx(.2)
+
+
+def test_strong_appearance_conflict_rejects_even_perfect_overlap():
+    adapter = DeepOCSortAdapter(TrackerYamlConfig(deep_appearance_weight=.55), 13)
+    track = SimpleNamespace(smooth_feat=np.array([1., 0.]))
+    detection = SimpleNamespace(curr_feat=np.array([0., 1.]), score=.9)
+    costs = adapter.backend._fuse_appearance(np.array([[0.]]), [track], [detection], np.array([[0.]]))
+    assert costs[0, 0] > adapter.backend.args.match_thresh
 
 
 def test_real_backend_uses_appearance_and_recovers_after_three_seconds():

@@ -57,11 +57,18 @@ class IdentityMemory:
         self.raw_ids = set()
         self.candidate_log = []
         self.pending = {}
+        self.match_evidence = {}
+        self.pending_features = {}
 
     def mark_exited(self, person_id):
         """Call only after a calibrated outward crossing, never a track timeout."""
         if person_id in self.people:
             self.people[person_id].state = "exited"
+
+    def mark_entered(self, person_id):
+        """A confirmed inward crossing resumes an identity that remained tracked outside."""
+        if person_id in self.people:
+            self.people[person_id].state = "visible"
 
     def update(self, visitors, image, frame_index):
         now = frame_index / self.fps
@@ -109,16 +116,19 @@ class IdentityMemory:
 
         visible_raw = {v.track_id for v in visitors}
         self.pending = {r: n for r, n in self.pending.items() if r in visible_raw}
+        self.match_evidence = {r: n for r, n in self.match_evidence.items() if r in visible_raw}
+        self.pending_features = {r: n for r, n in self.pending_features.items() if r in visible_raw}
         for v in visitors:
             if v.track_id not in self.bindings:
                 self.pending[v.track_id] = self.pending.get(v.track_id, 0) + 1
-        visitors = [v for v in visitors if v.track_id in self.bindings or
-                    (self.pending[v.track_id] >= self.config.identity_confirm_frames and
-                     (v.track_id in features or self.pending[v.track_id] >= max(self.config.identity_confirm_frames, int(self.fps))))]
+                if v.track_id in features:
+                    self.pending_features.setdefault(v.track_id, deque(maxlen=8)).append(features[v.track_id])
         # Score newcomers against the same gallery snapshot, then require mutual best matches.
         choices = {}
+        nearby_missing = set()
         for v in visitors:
             if v.track_id in self.bindings or v.track_id not in features:
+                self.match_evidence.pop(v.track_id, None)
                 continue
             candidates = []
             for pid, person in self.people.items():
@@ -128,7 +138,11 @@ class IdentityMemory:
                 distance = np.linalg.norm(np.subtract(v.centroid, person.centroid)) / diagonal
                 if distance > min(0.65, 0.08 + 0.06 * gap):
                     continue
-                score = max(float(np.dot(features[v.track_id], old)) for old in person.samples)
+                nearby_missing.add(v.track_id)
+                # Several recent crops must agree; one flattering crop is not sufficient.
+                recent = list(self.pending_features[v.track_id])[-self.config.identity_recovery_frames:]
+                score = float(np.mean([max(float(np.dot(query, old)) for old in person.samples)
+                                       for query in recent]))
                 candidates.append((score, pid))
             candidates.sort(reverse=True)
             if candidates:
@@ -138,14 +152,25 @@ class IdentityMemory:
                 runner_up = candidates[1][0] if len(candidates) > 1 else -1
                 if candidates[0][0] - runner_up >= self.config.identity_margin:
                     choices[v.track_id] = candidates[0]
+            candidate = choices.get(v.track_id)
+            previous, count = self.match_evidence.get(v.track_id, (None, 0))
+            self.match_evidence[v.track_id] = (
+                (candidate[1], count + 1 if previous == candidate[1] else 1)
+                if candidate else (None, 0)
+            )
         output = []
         for v in visitors:
             raw = v.track_id
             if raw not in self.bindings:
+                if self.pending[raw] < self.config.identity_confirm_frames:
+                    continue
+                if raw not in features and self.pending[raw] < max(self.config.identity_confirm_frames, int(self.fps)):
+                    continue
                 candidate = choices.get(raw)
                 competitors = sorted([s for r, (s, pid) in choices.items()
                                       if r != raw and candidate and pid == candidate[1]], reverse=True)
-                if (candidate and candidate[1] not in reserved and
+                if (candidate and self.match_evidence[raw][1] >= self.config.identity_recovery_frames
+                    and candidate[1] not in reserved and
                     (not competitors or candidate[0] - competitors[0] >= self.config.identity_margin)):
                     score, pid = candidate
                     person = self.people[pid]
@@ -155,6 +180,12 @@ class IdentityMemory:
                     # Retire the previous raw binding so it cannot duplicate this identity later.
                     self.bindings = {r: p for r, p in self.bindings.items() if p != pid}
                 else:
+                    # Allow another view before permanently assigning a new person ID.
+                    # This delay applies only when a nearby unresolved identity is plausible.
+                    wait_frames = max(self.config.identity_confirm_frames,
+                                      int(np.ceil(self.config.identity_new_wait_seconds * self.fps)))
+                    if raw in nearby_missing and self.pending[raw] < wait_frames:
+                        continue
                     if self.config.identity_memory_seconds is None and len(self.people) >= self.config.identity_max_entries:
                         exited = [p for p in self.people.values() if p.state == "exited" and p.person_id not in reserved]
                         if not exited:
@@ -163,17 +194,26 @@ class IdentityMemory:
                     pid = self.next_id
                     self.next_id += 1
                     self.people[pid] = Identity(pid, now, v.centroid)
+                    self.people[pid].samples.extend(self.pending_features.get(raw, ()))
                     self.events.append(dict(frame_index=frame_index, raw_track_id=raw,
                                             person_id=pid, action="new"))
                 self.bindings[raw] = pid
                 reserved.add(pid)
+                self.pending_features.pop(raw, None)
+                self.match_evidence.pop(raw, None)
             pid = self.bindings[raw]
             person = self.people[pid]
             person.last_seen, person.centroid = now, v.centroid
             if person.state != "exited":
                 person.state = "visible"
             if raw in features and person.state != "exited":
-                person.samples.append(features[raw])
+                # Keep a sudden incompatible crop from contaminating all future recoveries.
+                compatibility = max((float(np.dot(features[raw], old)) for old in person.samples), default=1.0)
+                if compatibility >= 0.35:
+                    person.samples.append(features[raw])
+                else:
+                    self.events.append(dict(frame_index=frame_index, raw_track_id=raw,
+                                            person_id=pid, action="appearance_conflict", similarity=compatibility))
                 person.last_sample = now
             output.append(replace(v, track_id=pid, raw_track_id=raw))
         # Hard bound for long live runs. Visible identities cannot be evicted mid-frame.

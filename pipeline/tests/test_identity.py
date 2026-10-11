@@ -12,7 +12,8 @@ def visitor(raw, x=50, confidence=0.9):
 
 
 def memory(**kwargs):
-    return IdentityMemory(TrackerYamlConfig(identity_confirm_frames=1, **kwargs), 10,
+    return IdentityMemory(TrackerYamlConfig(identity_confirm_frames=1, identity_recovery_frames=1,
+                                            identity_new_wait_seconds=0, **kwargs), 10,
                           encoder=lambda crops: np.array([[1., 0.] for _ in crops]))
 
 
@@ -111,3 +112,47 @@ def test_flat_head_only_crop_is_not_identity_evidence():
     v = TrackedVisitor(1, (50, 20, 250, 90), .9, (150,55))
     assert not m.update([v], IMAGE, 0)
     assert not m.people
+
+
+def test_recovery_waits_for_multiple_consistent_frames():
+    m=IdentityMemory(TrackerYamlConfig(identity_confirm_frames=1,identity_recovery_frames=3),10,
+                     encoder=lambda crops: np.array([[1.,0.] for _ in crops]))
+    assert m.update([visitor(1)],IMAGE,0)[0].track_id==1
+    m.update([],IMAGE,10)
+    assert not m.update([visitor(9,70)],IMAGE,20)
+    assert not m.update([visitor(9,70)],IMAGE,21)
+    assert m.update([visitor(9,70)],IMAGE,22)[0].track_id==1
+
+
+def test_bad_first_crop_does_not_permanently_fragment_the_identity():
+    feature=[1.,0.]
+    m=IdentityMemory(TrackerYamlConfig(identity_confirm_frames=1,identity_recovery_frames=3),10,
+                     encoder=lambda crops: np.array([feature for _ in crops]))
+    m.update([visitor(1)],IMAGE,0)
+    feature[:]=[0.,1.]
+    assert not m.update([visitor(9,70)],IMAGE,20)
+    feature[:]=[1.,0.]
+    outputs=[]
+    for index in range(21,26):
+        outputs.extend(m.update([visitor(9,70)],IMAGE,index))
+    assert outputs and all(v.track_id==1 for v in outputs)
+    assert m.next_id==2
+
+
+def test_unrelated_crop_does_not_pollute_an_existing_gallery():
+    feature=[1.,0.]
+    m=IdentityMemory(TrackerYamlConfig(identity_confirm_frames=1),10,
+                     encoder=lambda crops: np.array([feature for _ in crops]))
+    m.update([visitor(1)],IMAGE,0)
+    feature[:]=[0.,1.]
+    m.update([visitor(1)],IMAGE,20)
+    assert all(np.allclose(v,[1.,0.]) for v in m.people[1].samples)
+    assert m.events[-1]['action']=='appearance_conflict'
+
+
+def test_confirmed_inward_crossing_resumes_existing_identity():
+    m=memory()
+    m.update([visitor(1)],IMAGE,0)
+    m.mark_exited(1)
+    m.mark_entered(1)
+    assert m.people[1].state=='visible'

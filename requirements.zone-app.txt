@@ -1,0 +1,4 @@
+-r requirements.pipeline.txt
+fastapi>=0.110,<1
+uvicorn>=0.27,<1
+imageio-ffmpeg>=0.6,<1

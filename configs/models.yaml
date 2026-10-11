@@ -1,10 +1,10 @@
 # Model weights and inference thresholds for the detection pipeline.
 
 detector:
-  model_name: yolo26n.pt
+  model_name: yolo26s.pt
   # Preserve low-confidence detections for ByteTrack's second association pass.
   confidence_threshold: 0.1
-  imgsz: 640
+  imgsz: 960  # More detail for partly occluded people in the distant aisles; slower on CPU.
   cpu_threads: 4  # Tune on the target CPU; shared by all detector entry points.
   # Optional teammate preprocessing; disabled until tested on the sample footage.
   clahe: false
@@ -18,6 +18,8 @@ tracker:
   deep_lost_seconds: 10
   deep_proximity: 0.1
   deep_appearance: 0.75
+  deep_appearance_weight: 0.55
+  deep_reject_similarity: 0.1
   track_thresh: 0.3
   match_thresh: 0.8
   # Supervision scales this by source FPS / 30: 120 means about 4 seconds.
@@ -30,6 +32,8 @@ tracker:
   identity_memory_seconds: null  # Retain unresolved visits until confirmed exit or run reset.
   identity_max_entries: 500
   identity_sample_seconds: 1
+  identity_recovery_frames: 3
+  identity_new_wait_seconds: 0.8
 
 reid:
   enabled: true

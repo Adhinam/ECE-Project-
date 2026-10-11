@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
+from typing import Callable
 
 from shapely.geometry import Point, Polygon
 
@@ -111,7 +112,10 @@ class FullPipelineRunner:
         if settings.degrade_reid or not settings.enable_reid:
             self._reid_settings = self._reid_settings.model_copy(update={"enabled": False})
 
-    def run(self, video_source: str | Path | None = None) -> PipelineRunSummary:
+    def run(
+        self, video_source: str | Path | None = None, *,
+        on_frame: Callable | None = None,
+    ) -> PipelineRunSummary:
         source = Path(video_source or self._settings.pipeline_video_source)
         camera_id = self._settings.pipeline_camera_id
         store_id = self._layout.store_id or self._settings.pipeline_store_id
@@ -217,6 +221,8 @@ class FullPipelineRunner:
 
                     if raw.event_type == EventType.EXIT and tracker.identity_memory is not None:
                         tracker.identity_memory.mark_exited(raw.track_id)
+                    if raw.event_type == EventType.ENTRY and tracker.identity_memory is not None:
+                        tracker.identity_memory.mark_entered(raw.track_id)
                     completed = session.process_event(raw)
                     if raw.event_type == EventType.EXIT and completed and reentry_coord:
                         reentry_coord.on_visitor_exit(
@@ -234,9 +240,16 @@ class FullPipelineRunner:
                         events_emitted += 1
 
                 frames_processed += 1
+                if on_frame is not None:
+                    on_frame(frame, frame_tracks, processed, zones, meta)
 
             session.close_all_active(at=clock.timestamp_for_frame(last_frame_index + 1))
             emitter.flush()
+            self.identity_diagnostics = {
+                "events": list(tracker.identity_memory.events) if tracker.identity_memory else [],
+                "candidates": list(tracker.identity_memory.candidate_log) if tracker.identity_memory else [],
+                "raw_track_ids": len(tracker.identity_memory.raw_ids) if tracker.identity_memory else 0,
+            }
 
         jsonl_path = emitter.current_log_path
         logger.info(

@@ -140,3 +140,66 @@ def test_recovered_identity_does_not_invent_crossing_across_missing_frames():
     detector.process_frame(FrameTracks(0, (TrackedVisitor(1, (90,240,110,260), .9, (100,250)),)))
     events = detector.process_frame(FrameTracks(30, (TrackedVisitor(1, (90,140,110,160), .9, (100,150)),)))
     assert not events
+
+
+def make_detector(lines=None, **kwargs):
+    return EntryExitDetector(StoreLayoutConfig(store_id='test', entry_exit_lines=lines or [
+        EntryExitLine(id='door',p1=[50,200],p2=[150,200],direction_in='bottom')]),
+        EntryExitSettings(**kwargs), camera_id='cam', clock=VideoClock(fps=13))
+
+
+def track_at(x,y,index):
+    return FrameTracks(index,(TrackedVisitor(1,(int(x)-10,int(y)-20,int(x)+10,int(y)+20),.9,(x,y)),))
+
+
+def test_extension_of_doorway_is_not_a_crossing():
+    assert classify_crossing((300,250),(300,150),_horizontal_line()) is None
+    d=make_detector(debounce_frames=0)
+    assert not d.process_frame(track_at(300,250,0))
+    assert not d.process_frame(track_at(300,150,1))
+
+
+def test_slow_walk_crosses_even_below_per_frame_displacement_threshold():
+    d=make_detector()
+    events=[]
+    for index,y in enumerate(range(210,189,-1)):
+        events.extend(d.process_frame(track_at(100,y,index)))
+    assert [e.event_type.value for e in events]==['entry']
+
+
+def test_line_jitter_and_touch_then_retreat_are_not_crossings():
+    d=make_detector(cooldown_frames=0)
+    events=[]
+    for index,y in enumerate([208,206,201,199,201,198,202,206,208]):
+        events.extend(d.process_frame(track_at(100,y,index)))
+    assert events==[]
+
+
+def test_confirmed_entry_then_exit():
+    d=make_detector(cooldown_frames=0)
+    events=[]
+    for index,y in enumerate([210,209,196,195,190,204,205]):
+        events.extend(d.process_frame(track_at(100,y,index)))
+    assert [e.event_type.value for e in events]==['entry','exit']
+
+
+def test_unrelated_line_does_not_suppress_a_valid_crossing():
+    d=make_detector(lines=[EntryExitLine(id='vertical',p1=[100,0],p2=[100,400],direction_in='left'),
+                           EntryExitLine(id='horizontal',p1=[50,200],p2=[150,200],direction_in='bottom')],
+                    debounce_frames=0)
+    d.process_frame(track_at(100,220,0))
+    events=d.process_frame(track_at(100,180,1))
+    assert len(events)==1 and events[0].payload['line_id']=='horizontal'
+
+
+def test_weak_handover_cannot_complete_a_crossing():
+    from dataclasses import replace
+    d=make_detector()
+    assert not d.process_frame(track_at(100,220,0))
+    for index in (1,2,3):
+        frame=track_at(100,180,index)
+        frame=replace(frame,tracks=(replace(frame.tracks[0],confidence=.49),))
+        assert not d.process_frame(frame)
+    # Once the evidence gap is too long, a new clear box starts a new anchor.
+    assert not d.process_frame(track_at(100,180,4))
+    assert not d.process_frame(track_at(100,175,5))

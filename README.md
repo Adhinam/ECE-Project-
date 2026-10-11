@@ -1,5 +1,14 @@
 # Store Intelligence Platform
 
+## Visual camera calibration
+
+Double-click `start-zone-app.cmd` to open the local camera app: choose a video,
+draw named sections and doorway lines, choose an output folder, and process it.
+View the saved annotated video, entry/exit history, and per-ID zone dwell times
+on the same page. The standalone [zone editor](zone-editor/index.html) also works
+for drawing and saving layouts without running the model.
+See [editor instructions](zone-editor/README.md).
+
 ## Current CPU model and sample-video workflow
 
 The default model is **YOLO26 Nano**, with ByteTrack tracking. Review a sample

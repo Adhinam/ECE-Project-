@@ -76,8 +76,10 @@ class EntryExitSettings(BaseSettings):
     min_crossing_displacement_px: float = Field(
         default=4.0,
         ge=0.0,
-        description="Min movement along inward normal to count a crossing",
+        description="Total movement from the stable side needed to confirm a crossing",
     )
+    hysteresis_px: float = Field(default=3.0, ge=0, description="Ignore position jitter within this distance of the line")
+    max_observation_gap_seconds: float = Field(default=0.2, ge=0, description="Longer gaps reset crossing evidence")
     group_crossing_frame_window: int = Field(
         default=0,
         ge=0,
@@ -88,6 +90,8 @@ class EntryExitSettings(BaseSettings):
         description="If set, only this line id is evaluated",
     )
     entry_confidence_floor: float = Field(default=0.5, ge=0.0, le=1.0)
+    min_observation_confidence: float = Field(default=0.6, ge=0.0, le=1.0,
+        description="Weak boxes may continue tracking but cannot establish a doorway crossing")
     calibration_method: str = "threshold_v1"
 
 
@@ -117,6 +121,10 @@ class TrackLineState:
     last_entry_frame: int = -10_000
     last_exit_frame: int = -10_000
     armed: bool = True
+    anchor: tuple[float, float] | None = None
+    anchor_side: int = 0
+    candidate_side: int = 0
+    candidate_frames: int = 0
 
 
 def _cross_sign(line: LineSegment, point: tuple[float, float]) -> float:
@@ -207,8 +215,7 @@ def classify_crossing(
     crossed_segment = _segments_intersect(prev, curr, line.p1, line.p2)
 
     if not crossed_segment:
-        if prev_sign == 0 or curr_sign == 0 or prev_sign == curr_sign:
-            return None
+        return None
     elif prev_sign != 0 and curr_sign != 0 and prev_sign == curr_sign:
         return None
 
@@ -334,39 +341,58 @@ class EntryExitDetector:
         raw_crossings: list[CrossingEvent] = []
 
         for visitor in frame_tracks.tracks:
+            if visitor.confidence < self._settings.min_observation_confidence:
+                # Weak detections cannot anchor or complete a crossing, including
+                # a brief identity handover at an occluded doorway.
+                for line in self._lines:
+                    state = self._state(visitor.track_id, line.line_id)
+                    state.candidate_frames = 0
+                    state.candidate_side = 0
+                continue
             curr = visitor.centroid
-            displacement_ok = True
 
             for line in self._lines:
                 state = self._state(visitor.track_id, line.line_id)
-                curr_side = _side_from_sign(_cross_sign(line, curr))
+                length = ((line.p2[0]-line.p1[0])**2 + (line.p2[1]-line.p1[1])**2)**0.5
+                distance = _cross_sign(line, curr) / max(length, 1e-9)
+                curr_side = _side_from_sign(distance) if abs(distance) > self._settings.hysteresis_px else 0
                 # Re-ID jumps across an unobserved path are not observed door crossings.
-                if state.last_observed_frame is not None and frame_index - state.last_observed_frame > 2:
-                    state.last_centroid = None
-                    state.armed = False
-                    state.stable_side_frames = 0
+                max_gap = max(1, round(self._clock.fps * self._settings.max_observation_gap_seconds))
+                if state.last_observed_frame is not None and frame_index - state.last_observed_frame > max_gap:
+                    state.anchor = None
+                    state.anchor_side = 0
+                    state.candidate_side = 0
+                    state.candidate_frames = 0
                 state.last_observed_frame = frame_index
+                if curr_side == 0:
+                    # Keep the last clear-side anchor while passing slowly through the dead band.
+                    # A return to the band must not accumulate non-consecutive confirmations.
+                    state.candidate_frames = 0
+                    state.last_centroid = curr
+                    continue
+                if state.anchor is None or curr_side == state.anchor_side:
+                    state.anchor, state.anchor_side = curr, curr_side
+                    state.candidate_side, state.candidate_frames = 0, 0
+                    state.last_centroid = curr
+                    continue
+                if curr_side == state.candidate_side:
+                    state.candidate_frames += 1
+                else:
+                    state.candidate_side, state.candidate_frames = curr_side, 1
 
-                if state.last_centroid is not None:
-                    prev = state.last_centroid
+                if state.candidate_frames >= max(1, self._settings.debounce_frames):
+                    prev = state.anchor
                     nx, ny = _inward_normal(line)
                     normal_move = abs(
                         (curr[0] - prev[0]) * nx + (curr[1] - prev[1]) * ny
                     )
-                    if normal_move < self._settings.min_crossing_displacement_px:
-                        displacement_ok = False
-
                     direction = classify_crossing(prev, curr, line)
                     if (
                         direction is not None
-                        and state.armed
-                        and displacement_ok
+                        and normal_move >= self._settings.min_crossing_displacement_px
                         and self._cooldown_ok(state, direction, frame_index)
                     ):
-                        confidence = max(
-                            visitor.confidence,
-                            self._settings.entry_confidence_floor,
-                        )
+                        confidence = visitor.confidence
                         raw_crossings.append(
                             CrossingEvent(
                                 direction=direction,
@@ -387,9 +413,11 @@ class EntryExitDetector:
                             frame_index=frame_index,
                             confidence=round(confidence, 3),
                         )
+                    # Re-arm on the newly confirmed side even when a cooldown suppresses an event.
+                    state.anchor, state.anchor_side = curr, curr_side
+                    state.candidate_side, state.candidate_frames = 0, 0
 
                 state.last_centroid = curr
-                self._update_debounce(state, curr_side, frame_index)
 
         envelopes = self._apply_group_crossings(raw_crossings, frame_index)
         self._recent_events.extend(raw_crossings)

@@ -10,6 +10,30 @@ from ultralytics.trackers.deep_oc_sort import DeepOCSORT
 from pipeline.identity import AppearanceEncoder
 
 
+class BalancedDeepOCSORT(DeepOCSORT):
+    """Let appearance penalize a confident motion match, not only improve it.
+
+    Upstream min fusion cannot reject an unrelated detection with excellent box
+    overlap. Weak detections and missing embeddings retain upstream behavior.
+    A zero weight preserves the original association for comparison.
+    """
+
+    def _fuse_appearance(self, dists, tracks, detections, iou_dists=None):
+        fused = super()._fuse_appearance(dists, tracks, detections, iou_dists)
+        weight = getattr(self.args, 'appearance_weight', 0)
+        if not weight or self.encoder is None:
+            return fused
+        for i, track in enumerate(tracks):
+            for j, detection in enumerate(detections):
+                if track.smooth_feat is None or detection.curr_feat is None or detection.score < .6:
+                    continue
+                similarity = float(np.clip(np.dot(track.smooth_feat, detection.curr_feat), -1, 1))
+                fused[i, j] = (1-weight)*dists[i, j] + weight*(1-similarity)
+                if similarity < self.args.reject_similarity:
+                    fused[i, j] = 1.0
+        return fused
+
+
 class CropEncoder:
     """Bridge upstream xywh detections to a thread-limited ONNX encoder."""
 
@@ -49,8 +73,10 @@ class DeepOCSortAdapter:
             proximity_thresh=config.deep_proximity,
             appearance_thresh=config.deep_appearance,
             alpha_fixed_emb=0.95,
+            appearance_weight=config.deep_appearance_weight,
+            reject_similarity=config.deep_reject_similarity,
         )
-        self.backend = DeepOCSORT(args)
+        self.backend = BalancedDeepOCSORT(args)
         self.backend.encoder = CropEncoder(config.identity_model)
         self.backend.args.with_reid = True
 
