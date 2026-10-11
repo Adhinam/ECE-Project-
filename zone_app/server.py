@@ -26,6 +26,8 @@ REGISTRY = ROOT / '.runtime' / 'zone-app'
 TOKEN = secrets.token_urlsafe(32)
 LOCK = threading.Lock()
 PROCESSES = {}
+RESULT_FILES = ('annotated.mp4', 'report.json', 'layout.json', 'crossings.csv',
+                'zone_visits.csv', 'zone_totals.csv', 'queue_totals.csv', 'queue_visits.csv')
 app = FastAPI(title='Store Intelligence Video App')
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost'])
 
@@ -188,7 +190,11 @@ def jobs():
 
 @app.get('/api/jobs/{identity}')
 def status(identity: str):
-    return read_status(identity)
+    data = read_status(identity)
+    folder = job_folder(identity)
+    data['available_files'] = [name for name in RESULT_FILES if (folder / name).is_file()
+                               and (name == 'layout.json' or data['state'] == 'complete')]
+    return data
 
 
 @app.post('/api/jobs/{identity}/run')
@@ -220,13 +226,13 @@ async def run(identity: str, request: Request):
 @app.get('/api/jobs/{identity}/files/{filename}')
 def output_file(identity: str, filename: str, download: bool=False):
     folder=job_folder(identity)
-    if filename not in ('annotated.mp4','report.json','layout.json','crossings.csv','zone_visits.csv','zone_totals.csv'):
-        raise HTTPException(404)
+    if filename not in RESULT_FILES:
+        raise HTTPException(404, 'This file is not available for this saved run. Older runs may not contain billing queue reports.')
     if filename!='layout.json' and read_status(identity)['state']!='complete':
         raise HTTPException(409,'Results are available when processing finishes.')
     file=folder/filename
     if not file.is_file():
-        raise HTTPException(404)
+        raise HTTPException(404, 'This file is not available for this saved run. Older runs may not contain billing queue reports.')
     return FileResponse(file, filename=filename if download else None,
                         media_type='video/mp4' if filename.endswith('.mp4') else None)
 

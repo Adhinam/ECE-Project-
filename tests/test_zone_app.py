@@ -6,6 +6,9 @@ import pytest
 
 from zone_app.analytics import VideoAnalytics
 from zone_app.server import ROOT, WORKSPACE, output_base, validate_layout
+from zone_app import server
+from fastapi.testclient import TestClient
+import json
 
 
 def frame(index, ids=(7,)):
@@ -74,3 +77,46 @@ def test_layout_matches_real_video_and_rejects_bad_geometry():
     data=valid_layout();data['store_id']='../../events'
     with pytest.raises(HTTPException):
         validate_layout(data,spec)
+
+
+def test_billing_downloads_and_available_files(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, 'job_folder', lambda identity: tmp_path)
+    (tmp_path/'status.json').write_text(json.dumps({'state':'complete'}))
+    body='queue,visits\ndairy-billing,2\n'
+    for filename in ('queue_totals.csv', 'queue_visits.csv'):
+        (tmp_path/filename).write_text(body, newline='')
+    with TestClient(server.app, base_url='http://127.0.0.1') as client:
+        status=client.get('/api/jobs/'+'a'*32).json()
+        assert set(status['available_files'])=={'queue_totals.csv','queue_visits.csv'}
+        for filename in status['available_files']:
+            response=client.get('/api/jobs/'+'a'*32+'/files/'+filename+'?download=true')
+            assert response.status_code==200
+            assert response.text==body
+            assert 'attachment;' in response.headers['content-disposition']
+        # Missing legacy outputs are explained; private files stay inaccessible.
+        missing=client.get('/api/jobs/'+'a'*32+'/files/zone_totals.csv')
+        assert missing.status_code==404
+        assert 'not available' in missing.json()['detail']
+        (tmp_path/'processing.log').write_text('private log')
+        assert client.get('/api/jobs/'+'a'*32+'/files/processing.log').status_code==404
+        (tmp_path/'status.json').write_text(json.dumps({'state':'ready'}))
+        assert client.get('/api/jobs/'+'a'*32).json()['available_files']==[]
+        assert client.get('/api/jobs/'+'a'*32+'/files/queue_totals.csv').status_code==409
+
+
+def test_open_queue_visit_accumulates_time_without_inventing_departure():
+    analytics=VideoAnalytics()
+    analytics.configure_queues([Obj(id='billing',max_capacity=20)])
+    join=event('queue_join')
+    join.payload={'queue_id':'billing','entered_frame':10,'session_sequence':1}
+    zones=Obj(histories={})
+    analytics.update(frame(15),[join],zones,10)
+    analytics.update(frame(39),[],zones,10)
+    live=analytics.report()
+    assert live['queue_visits'][0]['wait_seconds']==3
+    assert live['queues'][0]['total_wait_seconds']==3
+    assert live['queue_visits'][0]['status']=='in queue'
+    finished=analytics.report(complete=True)['queue_visits'][0]
+    assert finished['status']=='end of video (partial)'
+    assert finished['left_seconds'] is None
+    assert analytics.queue_visits[0]['status']=='in queue'

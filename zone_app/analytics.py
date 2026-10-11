@@ -83,11 +83,11 @@ class VideoAnalytics:
                 visit['status'] = 'end of video (partial)'
             totals[(visit['id'], visit['zone'])] += visit['dwell_seconds']
         queue_visits = [dict(v) for v in self.queue_visits]
-        if complete:
-            for visit in queue_visits:
-                if visit['status'] == 'in queue':
+        for visit in queue_visits:
+            if visit['status'] == 'in queue':
+                visit['wait_seconds'] = round(max(0, self.seconds - visit['joined_seconds']), 3)
+                if complete:
                     visit['status'] = 'end of video (partial)'
-                    visit['wait_seconds'] = round(max(0, self.seconds - visit['joined_seconds']), 3)
         queue_totals = defaultdict(float)
         queue_ids = defaultdict(set)
         for visit in queue_visits:

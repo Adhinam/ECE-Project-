@@ -90,3 +90,16 @@ boundaries with that in mind; footpoint-based floor zoning can be a later improv
 Staff areas use the project's current zone heuristic and do not verify staff identity.
 
 Drawing changes stay in memory until saved or processed. Save before closing the page.
+
+Processed results persist in the run folder. Selecting or starting a run saves its
+ID in the page URL and remembers it in this browser. Refreshing restores that run;
+unsaved drawing edits still need to be exported separately.
+
+CSV buttons download without replacing the dashboard. Only files that exist for
+the selected completed run are offered. Older runs may lack billing exports;
+their existing results remain available. Downloads include all records, independent
+of table filters. CSV durations and timestamps are seconds from the recording;
+the dashboard formats durations as minutes and seconds. Queue summary counts cover
+all IDs, while the ID filter applies to individual visit records. Combined queue
+time is the sum of visit durations, including overlapping visits and partial visits
+at the end of the recording; it is not confirmed checkout service time.
