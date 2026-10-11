@@ -33,6 +33,7 @@ def process_run(folder):
     spec = json.loads((folder / 'job.json').read_text(encoding='utf-8'))
     layout = StoreLayoutConfig.model_validate_json((folder / 'layout.json').read_text(encoding='utf-8'))
     stats = VideoAnalytics()
+    stats.configure_queues(layout.queues)
     status = {'state': 'running', 'message': 'Loading detector and tracker…', 'output_folder': str(folder)}
     encoder = None
     stderr = (folder / 'encoder.log').open('wb')
@@ -71,7 +72,10 @@ def process_run(folder):
                 for zone in group:
                     polygon = np.asarray(zone.polygon, dtype=np.int32)
                     cv2.polylines(overlay, [polygon], True, color, 2)
-                    cv2.putText(overlay, zone.id, tuple(polygon[0]), cv2.FONT_HERSHEY_SIMPLEX, .6, color, 2)
+                    label = zone.id
+                    if group is layout.queues:
+                        label = f'{zone.id}  {stats.queue_depths.get(zone.id, 0)}/{zone.max_capacity}'
+                    cv2.putText(overlay, label, tuple(polygon[0]), cv2.FONT_HERSHEY_SIMPLEX, .6, color, 2)
             for line in layout.entry_exit_lines:
                 cv2.line(overlay, tuple(line.p1), tuple(line.p2), (130, 240, 120), 3)
                 nx, ny = _inward_normal(line_from_config(line))
@@ -122,6 +126,8 @@ def process_run(folder):
             ('crossings.csv', report['crossings'], ['type','id','visitor_id','seconds','doorway']),
             ('zone_visits.csv', report['visits'], ['id','zone','visit','entered_seconds','exited_seconds','dwell_seconds','status']),
             ('zone_totals.csv', report['zone_totals'], ['id','zone','dwell_seconds']),
+            ('queue_visits.csv', report['queue_visits'], ['id','queue','visit','joined_seconds','left_seconds','wait_seconds','status']),
+            ('queue_totals.csv', report['queues'], ['queue','capacity','current_depth','peak_depth','average_depth','visits','unique_ids','total_wait_seconds']),
         ):
             with (folder / name).open('w', newline='', encoding='utf-8-sig') as handle:
                 writer = csv.DictWriter(handle, fieldnames=fields)

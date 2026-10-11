@@ -40,6 +40,14 @@ Other identity fragmentation remains possible; the whole clip has not been
 manually labelled. Verification: 211 automated tests, plus saved-run browser
 playback and seeking checks. Earlier runs remain available for comparison.
 
+Billing queue polygons are saved separately and passed to the queue tracker.
+Queue visit and depth results now also appear in the website dashboard and in
+`queue_visits.csv` / `queue_totals.csv`. Queue depth uses detected person centres
+inside the marked area; queue visits require a confident track to stay in the
+polygon for about half a second. Leaving the polygon is reported as leaving that
+area, since it alone cannot establish that someone abandoned the line or finished
+checkout. Older runs need to be processed again to create these queue reports.
+
 The original doorway is on the extreme image border. Counting uses bounding-box
 centres; a crossing cannot be observed if the centre is only visible on one side.
 The editor warns about border lines and offers **Move doorway inward**, with undo.

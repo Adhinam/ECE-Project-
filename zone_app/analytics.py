@@ -7,6 +7,10 @@ class VideoAnalytics:
         self.crossings = []
         self.observed = set()
         self.visits = []
+        self.queue_visits = []
+        self.queue_depth_samples = defaultdict(list)
+        self.queue_depths = {}
+        self.queue_capacities = {}
         self.frames = 0
         self.seconds = 0.0
 
@@ -24,6 +28,34 @@ class VideoAnalytics:
                     'seconds': tracks.frame_index / fps,
                     'doorway': event.payload.get('line_id') or event.payload.get('entry_line_id', ''),
                 })
+            elif kind in ('queue_join', 'queue_leave', 'queue_depth'):
+                queue_id = event.payload.get('queue_id')
+                if not queue_id:
+                    continue
+                seconds = tracks.frame_index / fps
+                depth = int(event.payload.get('queue_depth', 0))
+                if kind == 'queue_depth':
+                    self.queue_depths[queue_id] = depth
+                    self.queue_depth_samples[queue_id].append(depth)
+                elif kind == 'queue_join':
+                    self.queue_visits.append({
+                        'id': event.track_id,
+                        'queue': queue_id,
+                        'visit': event.payload.get('session_sequence', 1),
+                        'joined_seconds': event.payload.get('entered_frame', tracks.frame_index) / fps,
+                        'left_seconds': None,
+                        'wait_seconds': 0.0,
+                        'status': 'in queue',
+                    })
+                else:
+                    match = next((v for v in reversed(self.queue_visits)
+                                  if v['id'] == event.track_id and v['queue'] == queue_id
+                                  and v['visit'] == event.payload.get('session_sequence')
+                                  and v['status'] == 'in queue'), None)
+                    if match is not None:
+                        match['left_seconds'] = seconds
+                        match['wait_seconds'] = round(float(event.payload.get('dwell_seconds', 0)), 3)
+                        match['status'] = 'left queue area'
         self.visits = []
         for identity, history in zones.histories.items():
             for visit in history.visits:
@@ -40,6 +72,9 @@ class VideoAnalytics:
                     'status': 'closed' if end is not None else 'open',
                 })
 
+    def configure_queues(self, queues):
+        self.queue_capacities = {queue.id: queue.max_capacity for queue in queues}
+
     def report(self, *, complete=False):
         totals = defaultdict(float)
         visits = [dict(v) for v in self.visits]
@@ -47,6 +82,30 @@ class VideoAnalytics:
             if complete and visit['status'] == 'open':
                 visit['status'] = 'end of video (partial)'
             totals[(visit['id'], visit['zone'])] += visit['dwell_seconds']
+        queue_visits = [dict(v) for v in self.queue_visits]
+        if complete:
+            for visit in queue_visits:
+                if visit['status'] == 'in queue':
+                    visit['status'] = 'end of video (partial)'
+                    visit['wait_seconds'] = round(max(0, self.seconds - visit['joined_seconds']), 3)
+        queue_totals = defaultdict(float)
+        queue_ids = defaultdict(set)
+        for visit in queue_visits:
+            queue_totals[visit['queue']] += visit['wait_seconds']
+            queue_ids[visit['queue']].add(visit['id'])
+        queues = []
+        for queue_id in sorted(set(self.queue_capacities) | set(self.queue_depths) | {v['queue'] for v in queue_visits}):
+            samples = self.queue_depth_samples[queue_id]
+            queues.append({
+                'queue': queue_id,
+                'capacity': self.queue_capacities.get(queue_id),
+                'current_depth': self.queue_depths.get(queue_id, 0),
+                'peak_depth': max(samples, default=self.queue_depths.get(queue_id, 0)),
+                'average_depth': round(sum(samples) / len(samples), 2) if samples else 0.0,
+                'visits': sum(v['queue'] == queue_id for v in queue_visits),
+                'unique_ids': len(queue_ids[queue_id]),
+                'total_wait_seconds': round(queue_totals[queue_id], 3),
+            })
         return {
             'frames_processed': self.frames, 'video_seconds_processed': round(self.seconds, 3),
             'entries': sum(e['type'] == 'entry' for e in self.crossings),
@@ -55,7 +114,13 @@ class VideoAnalytics:
             'visits': visits,
             'zone_totals': [{'id': i, 'zone': z, 'dwell_seconds': round(s, 3)}
                             for (i, z), s in sorted(totals.items())],
-            'notes': 'IDs are camera-local tracking identities, not verified unique customers. '
+            'queues': queues,
+            'queue_visits': queue_visits,
+            'queue_totals': [{'queue': q, 'wait_seconds': round(seconds, 3)}
+                             for q, seconds in sorted(queue_totals.items())],
+            'notes': 'Queue time is the tracked time inside each drawn queue polygon; brief crossings are ignored. '
+                     'IDs can fragment when people are occluded. Queue leave means leaving the marked area; it does not prove abandonment or checkout. '
+                     'IDs are camera-local tracking identities, not verified unique customers. '
                      'People already visible at the start are not invented entry events. '
                      'Zone time follows the current centroid and occlusion-grace logic; '
                      'unfinished visits are partial and are not physical exits.',

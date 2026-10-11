@@ -32,9 +32,15 @@ class _QueueMembership:
     inside: bool = True
 
 
+@dataclass
+class _QueueCandidate:
+    first_seen_frame: int
+    last_seen_frame: int
+
+
 class QueueTrackingEngine:
     """
-    Emit QUEUE_JOIN / QUEUE_LEAVE (billing abandon) and periodic QUEUE_DEPTH.
+    Emit stable QUEUE_JOIN / QUEUE_LEAVE observations and periodic QUEUE_DEPTH.
 
     Uses `StoreLayoutConfig.queues`; if none are configured, falls back to the
     checkout zone polygon when present (id `checkout` or first zone named checkout).
@@ -54,8 +60,10 @@ class QueueTrackingEngine:
         self._depth_interval = max(1, depth_emit_interval_frames)
         self._queues = self._load_queue_polygons(layout)
         self._members: dict[tuple[int, str], _QueueMembership] = {}
+        self._candidates: dict[tuple[int, str], _QueueCandidate] = {}
         self._seq: dict[tuple[int, str], int] = {}
         self._last_depth_frame = -self._depth_interval
+        self._confirm_frames = max(1, round(clock.fps * 0.5))
         if not self._queues:
             logger.warning("queue_tracking_no_queues", store_id=layout.store_id)
 
@@ -141,20 +149,37 @@ class QueueTrackingEngine:
         frame_index = frame_tracks.frame_index
         events: list[EventEnvelope] = []
         active_keys: set[tuple[int, str]] = set()
+        present_keys = {(track.track_id, queue.queue_id)
+                        for track in frame_tracks.tracks for queue in self._queues}
+        for key, candidate in list(self._candidates.items()):
+            if key not in present_keys and frame_index-candidate.last_seen_frame > max(1, round(self._clock.fps*.3)):
+                del self._candidates[key]
 
         for track in frame_tracks.tracks:
             for queue in self._queues:
                 key = (track.track_id, queue.queue_id)
+                if track.confidence < 0.6:
+                    self._candidates.pop(key, None)
+                    continue
                 inside = self._centroid_in_queue(track, queue)
                 if inside:
                     active_keys.add(key)
                     member = self._members.get(key)
                     if member is None or not member.inside:
+                        candidate = self._candidates.get(key)
+                        if candidate is None:
+                            self._candidates[key] = _QueueCandidate(frame_index, frame_index)
+                            continue
+                        candidate.last_seen_frame = frame_index
+                        if frame_index - candidate.first_seen_frame + 1 < self._confirm_frames:
+                            continue
+                        joined_frame = candidate.first_seen_frame
+                        self._candidates.pop(key, None)
                         seq = self._next_sequence(track.track_id, queue.queue_id)
                         self._members[key] = _QueueMembership(
                             queue_id=queue.queue_id,
                             track_id=track.track_id,
-                            joined_frame=frame_index,
+                            joined_frame=joined_frame,
                             session_sequence=seq,
                             inside=True,
                         )
@@ -170,6 +195,7 @@ class QueueTrackingEngine:
                                 payload={
                                     "session_sequence": seq,
                                     "queue_depth": depth,
+                                    "entered_frame": joined_frame,
                                     "billing_queue": True,
                                 },
                             )
@@ -198,6 +224,8 @@ class QueueTrackingEngine:
                             },
                         )
                     )
+                else:
+                    self._candidates.pop(key, None)
 
         if frame_index - self._last_depth_frame >= self._depth_interval:
             self._last_depth_frame = frame_index
@@ -236,6 +264,11 @@ class QueueTrackingEngine:
             return 0
         count = 0
         for track in frame_tracks.tracks:
-            if self._centroid_in_queue(track, queue):
-                count += 1
+            key = (track.track_id, queue_id)
+            candidate = self._candidates.get(key)
+            confirmed_candidate = (candidate is not None and
+                                   frame_tracks.frame_index-candidate.first_seen_frame+1 >= self._confirm_frames)
+            if (key in self._members and self._members[key].inside) or confirmed_candidate:
+                if track.confidence >= 0.6 and self._centroid_in_queue(track, queue):
+                    count += 1
         return count

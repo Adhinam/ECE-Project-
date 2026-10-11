@@ -159,6 +159,7 @@ class FullPipelineRunner:
                 self._layout,
                 camera_id=camera_id,
                 clock=clock,
+                depth_emit_interval_frames=max(1, round(meta.fps or 25.0)),
             )
             session = SessionEngine(store_id, self._session_settings)
             reentry_coord: ReentryCoordinator | None = None

@@ -18,7 +18,11 @@ If setting up on a new computer, install the project environment dependencies:
    and click **Start drawing**. Click the corners and **Finish shape**.
 3. For **Entry / exit doorway**, click two line endpoints, then click inside the
    store. The IN arrow must point inward. One line counts crossings both ways.
-4. Add billing queue polygons and staff areas if needed. Select any saved shape
+4. For a billing queue, draw tightly around the path where shoppers wait. Leave
+   out the checkout counter and nearby aisle. Shoppers count when their detected
+   box centre stays inside for about half a second. The dashboard shows current
+   and peak depth, people seen, queue visits and time in the marked area. Add
+   staff areas if needed. Select any saved shape
    and drag its vertices to adjust. Undo also restores deletions and adjustments.
 5. Use **Save layout JSON…** to choose a file location (supported browsers), or
    **Save & process video** to save the layout and annotated video together.
@@ -37,7 +41,8 @@ time. The completed H.264 MP4 plays on the same page and can be downloaded.
 The annotated output is silent; the original source copy retains its original audio.
 
 Results include `annotated.mp4`, `layout.json`, `report.json`, `crossings.csv`,
-`zone_visits.csv`, `zone_totals.csv`, and pipeline JSONL under `events/`.
+`zone_visits.csv`, `zone_totals.csv`, `queue_visits.csv`, `queue_totals.csv`,
+and pipeline JSONL under `events/`.
 Use **Open a saved run** to reload earlier results after restarting the app.
 Model loading and inference may take longer than the video itself on CPU.
 The current default uses YOLO26 Small at 960px with appearance-weighted matching,
